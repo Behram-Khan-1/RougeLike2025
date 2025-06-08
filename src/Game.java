@@ -19,6 +19,8 @@ public class Game extends JPanel implements Runnable {
     private ArrayList<Bullet> bullets;
     private Camera camera;
 
+    private int enemyRespawnTimer = 0;
+
     public Game() {
         setPreferredSize(new Dimension(VIEWPORT_WIDTH, VIEWPORT_HEIGHT));
         setBackground(Color.BLACK);
@@ -59,9 +61,19 @@ public class Game extends JPanel implements Runnable {
         }
     }
 
+    private void respawnEnemies() {
+        if (enemyRespawnTimer <= 0) {
+            enemies.add(new Enemy((int)(Math.random() * MAP_WIDTH), (int)(Math.random() * MAP_HEIGHT)));
+            enemyRespawnTimer = 300; // Reset timer
+        } else {
+            enemyRespawnTimer--;
+        }
+    }
+
     private void update() {
         player.update(MAP_WIDTH, MAP_HEIGHT);
         camera.update(player.getPosition().x, player.getPosition().y);
+        respawnEnemies();
         for (Enemy enemy : enemies) {
             enemy.update(player);
             // Enemy shooting logic
