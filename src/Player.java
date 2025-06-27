@@ -3,7 +3,14 @@ import java.awt.*;
 
 public class Player {
     int x, y, speed = 3;
-    int health = 100; // Add health attribute
+    private int health = 100; // Add health attribute
+    public int getHealth() {
+        return health;
+    }
+
+    public void setHealth(int health) {
+        this.health = health;
+    }
 
     public Player(int x, int y) {
         this.x = x;
@@ -11,6 +18,7 @@ public class Player {
     }
 
     public void update(int mapWidth, int mapHeight) {
+        if (health <= 0) return; // Prevent movement if dead
         if (InputHandler.up) y = Math.max(0, y - speed);
         if (InputHandler.down) y = Math.min(mapHeight - 20, y + speed);
         if (InputHandler.left) x = Math.max(0, x - speed);
@@ -75,8 +83,10 @@ public class Player {
 
 
     public void takeDamage(int damage) {
+        if (health <= 0) return;
         health -= damage;
-        if (health <= 0) {
+        if (health < 0) health = 0;
+        if (health == 0) {
            System.out.println("Player died");
         }
     }
