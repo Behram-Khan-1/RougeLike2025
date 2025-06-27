@@ -54,6 +54,7 @@ public class Game extends JPanel implements Runnable {
         enemies = new ArrayList<>();
         bullets = new ArrayList<>();
         enemies.add(new SquareEnemy(1000, 1000));
+        enemies.add(new HealerEnemy(1100, 1100));
         camera = new Camera(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, MAP_WIDTH, MAP_HEIGHT);
         coverManager = new DiamondCoverManager();
     }
@@ -72,13 +73,21 @@ public class Game extends JPanel implements Runnable {
     }
 
     public void run() {
+        final int targetFPS = 60;
+        final long frameDuration = 1000 / targetFPS;
         while (running) {
+            long frameStart = System.currentTimeMillis();
             update();
             repaint();
-            try {
-                Thread.sleep(16);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+            long frameEnd = System.currentTimeMillis();
+            long elapsed = frameEnd - frameStart;
+            long sleepTime = frameDuration - elapsed;
+            if (sleepTime > 0) {
+                try {
+                    Thread.sleep(sleepTime);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
             }
         }
     }

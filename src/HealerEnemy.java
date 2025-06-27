@@ -8,61 +8,38 @@ public class HealerEnemy extends BaseEnemy {
 
     @Override
     public void update(Player player, List<BaseEnemy> allEnemies) {
-        // 1. Find the nearest low-health ally (not self, below 80% health, within 300px)
-        BaseEnemy targetAlly = null;
-        double minDist = Double.MAX_VALUE;
-        for (BaseEnemy e : allEnemies) {
-            if (e != this && e.isAlive() && e.health < e.maxHealth * 0.8) {
-                double d = getPosition().distance(e.getPosition());
-                if (d < 300 && d < minDist) {
-                    minDist = d;
-                    targetAlly = e;
-                }
-            }
-        }
-
-        int tx = x, ty = y;
-        if (targetAlly != null) {
-            // Move toward the low-health ally
-            double dx = targetAlly.getPosition().x - x;
-            double dy = targetAlly.getPosition().y - y;
-            double len = Math.sqrt(dx * dx + dy * dy);
-            if (len > 1) {
-                dx /= len;
-                dy /= len;
-                tx = x + (int)(dx * speed);
-                ty = y + (int)(dy * speed);
-            }
-        } else {
-            // Patrol: move randomly, but repel from other healers (stronger patrol)
-            double repelX = (Math.random() - 0.5) * 2.0;
-            double repelY = (Math.random() - 0.5) * 2.0;
-            for (BaseEnemy e : allEnemies) {
-                if (e != this && e instanceof HealerEnemy && e.isAlive()) {
-                    double d = getPosition().distance(e.getPosition());
-                    if (d < 50 && d > 0) {
-                        repelX += (x - e.getPosition().x) / d;
-                        repelY += (y - e.getPosition().y) / d;
+        BaseEnemy target = getLowestHealthAlly(allEnemies);
+        if (target != null) {
+            double dist = getPosition().distance(target.getPosition());
+            // If close enough, heal
+            if (dist < 50) {
+                if (target.health < target.maxHealth) {
+                    // Heal at 2 HP per second (assuming 60 FPS)
+                    target.health += 11 / 60.0;
+                    if (target.health > target.maxHealth) {
+                        target.health = target.maxHealth;
                     }
                 }
-            }
-            double len = Math.sqrt(repelX * repelX + repelY * repelY);
-            if (len > 0.1) {
-                repelX /= len;
-                repelY /= len;
-                tx = x + (int)(repelX * speed);
-                ty = y + (int)(repelY * speed);
+            } else {
+                // Move closer to the ally
+                moveWithCollision(target.x, target.y, allEnemies);
             }
         }
-        moveWithCollision(tx, ty, allEnemies);
+    }
 
-        // Heal nearby allies
+    private BaseEnemy getLowestHealthAlly(List<BaseEnemy> allEnemies) {
+        BaseEnemy lowest = null;
+        double minRatio = 1.0;
         for (BaseEnemy e : allEnemies) {
-            if (e != this && e.isAlive() && e.health < e.maxHealth && getPosition().distance(e.getPosition()) < 80) {
-                e.health += 2.0 / 60.0; // 2 hp per second (assuming 60 FPS)
-                if (e.health > e.maxHealth) e.health = e.maxHealth;
+            if (e == this || !e.isAlive() || e.health >= e.maxHealth)
+                continue;
+            double ratio = e.health / (double) e.maxHealth;
+            if (ratio < minRatio) {
+                minRatio = ratio;
+                lowest = e;
             }
         }
+        return lowest;
     }
 
     @Override
@@ -72,7 +49,8 @@ public class HealerEnemy extends BaseEnemy {
 
     @Override
     public void draw(Graphics g, Camera camera) {
-        if (!isAlive()) return;
+        if (!isAlive())
+            return;
         int screenX = camera.getScreenX(x);
         int screenY = camera.getScreenY(y);
         g.setColor(Color.GREEN);
@@ -80,7 +58,7 @@ public class HealerEnemy extends BaseEnemy {
         g.setColor(Color.WHITE);
         g.drawString("+", screenX + 5, screenY + 15);
         g.setColor(Color.GREEN);
-        int healthBarWidth = (int)((health / (double)maxHealth) * 20);
+        int healthBarWidth = (int) ((health / (double) maxHealth) * 20);
         g.fillRect(screenX, screenY - 5, healthBarWidth, 3);
     }
 }

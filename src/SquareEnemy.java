@@ -139,6 +139,7 @@ public class SquareEnemy extends BaseEnemy {
         g.setColor(Color.GREEN);
         int healthBarWidth = (int)((health / (double)maxHealth) * 20);
         g.fillRect(screenX, screenY - 5, healthBarWidth, 3);
+        System.out.println("SquareEnemy health: " + health);
     }
 
 }

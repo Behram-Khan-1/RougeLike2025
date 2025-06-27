@@ -42,6 +42,8 @@ public abstract class BaseEnemy {
 
     // Move towards (tx, ty) but avoid overlapping with other enemies
     protected void moveWithCollision(int tx, int ty, List<BaseEnemy> allEnemies) {
+        if (Math.abs(x - tx) < 2 && Math.abs(y - ty) < 2) return;
+
         int[] dx = {0, speed, -speed, 0, 0, speed, -speed, speed, -speed};
         int[] dy = {0, 0, 0, speed, -speed, speed, speed, -speed, -speed};
         int bestDir = -1;
