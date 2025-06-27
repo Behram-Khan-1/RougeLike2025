@@ -10,10 +10,44 @@ public class SquareEnemy extends BaseEnemy {
 
 
     private BaseEnemy currentCoverDiamond = null;
+    private Double fixedCoverAngle = null;
 
     // Main update method with cover manager
     public void update(Player player, List<BaseEnemy> allEnemies, DiamondCoverManager coverManager) {
         double dist = player.getPosition().distance(x, y);
+        boolean lowHP = health < 0.3 * maxHealth;
+        BaseEnemy nearestHealer = null;
+        double minHealerDist = Double.MAX_VALUE;
+        for (BaseEnemy e : allEnemies) {
+            if (e != this && e instanceof HealerEnemy && e.isAlive()) {
+                double d = getPosition().distance(e.getPosition());
+                if (d < minHealerDist) {
+                    minHealerDist = d;
+                    nearestHealer = e;
+                }
+            }
+        }
+        if (lowHP && nearestHealer != null) {
+            // FLEE: Move toward healer
+            double dx = nearestHealer.getPosition().x - x;
+            double dy = nearestHealer.getPosition().y - y;
+            double len = Math.sqrt(dx * dx + dy * dy);
+            int tx = x, ty = y;
+            if (len > 1) {
+                dx /= len;
+                dy /= len;
+                tx = x + (int)(dx * speed);
+                ty = y + (int)(dy * speed);
+            }
+            moveWithCollision(tx, ty, allEnemies);
+            // Remove cover if fleeing
+            if (currentCoverDiamond != null && coverManager != null) {
+                coverManager.removeCover(currentCoverDiamond);
+                currentCoverDiamond = null;
+                fixedCoverAngle = null;
+            }
+            return;
+        }
         if (dist < 200) {
             state = AIState.CHASE;
         } else {
@@ -38,20 +72,27 @@ public class SquareEnemy extends BaseEnemy {
                     if (currentCoverDiamond != null) coverManager.removeCover(currentCoverDiamond);
                     coverManager.assignCover(bestDiamond, this);
                     currentCoverDiamond = bestDiamond;
+                    // Pick a fixed angle for this cover session
+                    double dx = bestDiamond.getPosition().x - player.x;
+                    double dy = bestDiamond.getPosition().y - player.y;
+                    double baseAngle = Math.atan2(dy, dx);
+                    fixedCoverAngle = baseAngle + Math.toRadians((Math.random() - 0.5) * 60);
                 }
-                // Move behind diamond
-                double dx = bestDiamond.getPosition().x - player.x;
-                double dy = bestDiamond.getPosition().y - player.y;
-                double baseAngle = Math.atan2(dy, dx);
-                double angleOffset = Math.toRadians((Math.random() - 0.5) * 60);
-                double angle = baseAngle + angleOffset;
-                int offsetX = (int)(Math.cos(angle) * 30);
-                int offsetY = (int)(Math.sin(angle) * 30);
+                // Move behind diamond at fixed angle
+                if (fixedCoverAngle == null) {
+                    double dx = bestDiamond.getPosition().x - player.x;
+                    double dy = bestDiamond.getPosition().y - player.y;
+                    double baseAngle = Math.atan2(dy, dx);
+                    fixedCoverAngle = baseAngle + Math.toRadians((Math.random() - 0.5) * 60);
+                }
+                int offsetX = (int)(Math.cos(fixedCoverAngle) * 30);
+                int offsetY = (int)(Math.sin(fixedCoverAngle) * 30);
                 moveWithCollision(bestDiamond.getPosition().x + offsetX, bestDiamond.getPosition().y + offsetY, allEnemies);
                 return;
             } else if (currentCoverDiamond != null) {
                 coverManager.removeCover(currentCoverDiamond);
                 currentCoverDiamond = null;
+                fixedCoverAngle = null;
             }
             int wiggleX = (int)((Math.random() - 0.5) * 5);
             int wiggleY = (int)((Math.random() - 0.5) * 5);
@@ -59,6 +100,7 @@ public class SquareEnemy extends BaseEnemy {
         } else if (currentCoverDiamond != null) {
             coverManager.removeCover(currentCoverDiamond);
             currentCoverDiamond = null;
+            fixedCoverAngle = null;
         }
     }
 
