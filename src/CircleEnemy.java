@@ -3,13 +3,13 @@ import java.util.List;
 
 public class CircleEnemy extends BaseEnemy {
     public CircleEnemy(int x, int y) {
-        super(x, y, 80, 3);
+        super(x, y, 80, 2);
     }
 
     @Override
     public void update(Player player, List<BaseEnemy> allEnemies) {
         double dist = player.getPosition().distance(x, y);
-        if (dist < 200) {
+        if (dist < 350) {
             state = AIState.CHASE;
         } else {
             state = AIState.IDLE;

@@ -4,12 +4,15 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
+// Modular enemy imports
+// (No explicit imports needed for same-package classes)
 
 public class Game extends JPanel implements Runnable {
     // --- Enemy spawn timing (seconds) ---
     private static final int SQUARE_START = 0;
     private static final int DIAMOND_START = 0;
-    private static final int CIRCLE_START = 0;
+    private static final int CIRCLE_START = 120;
     private static final int HEALER_START = 0;
     private static final int DIAMOND_LOW_RATE_START = 40;
 
@@ -28,7 +31,7 @@ public class Game extends JPanel implements Runnable {
     private static final int VIEWPORT_HEIGHT = 1000;
 
     private Player player;
-    private ArrayList<Enemy> enemies;
+    private ArrayList<BaseEnemy> enemies;
     private ArrayList<Bullet> bullets;
     private Camera camera;
 
@@ -36,6 +39,8 @@ public class Game extends JPanel implements Runnable {
 
     private int frameCount = 0;
     private int squareTimer = 0, diamondTimer = 0, circleTimer = 0, healerTimer = 0;
+
+    private DiamondCoverManager coverManager;
 
     public Game() {
         setPreferredSize(new Dimension(VIEWPORT_WIDTH, VIEWPORT_HEIGHT));
@@ -48,8 +53,9 @@ public class Game extends JPanel implements Runnable {
         player = new Player(500, 500);
         enemies = new ArrayList<>();
         bullets = new ArrayList<>();
-        enemies.add(new Enemy(1000, 1000, Enemy.EnemyType.SQUARE));
+        enemies.add(new SquareEnemy(1000, 1000));
         camera = new Camera(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, MAP_WIDTH, MAP_HEIGHT);
+        coverManager = new DiamondCoverManager();
     }
 
     public void start() {
@@ -85,7 +91,7 @@ public class Game extends JPanel implements Runnable {
         if (seconds >= SQUARE_START) {
             squareTimer++;
             if (squareTimer >= SQUARE_SPAWN_RATE) {
-                enemies.add(new Enemy((int)(Math.random() * MAP_WIDTH), (int)(Math.random() * MAP_HEIGHT), Enemy.EnemyType.SQUARE));
+                enemies.add(new SquareEnemy((int)(Math.random() * MAP_WIDTH), (int)(Math.random() * MAP_HEIGHT)));
                 squareTimer = 0;
             }
         }
@@ -94,7 +100,7 @@ public class Game extends JPanel implements Runnable {
             diamondTimer++;
             int rate = (seconds >= DIAMOND_LOW_RATE_START) ? DIAMOND_SPAWN_RATE : 600; // slower before 40s
             if (diamondTimer >= rate) {
-                enemies.add(new Enemy((int)(Math.random() * MAP_WIDTH), (int)(Math.random() * MAP_HEIGHT), Enemy.EnemyType.DIAMOND));
+                enemies.add(new DiamondEnemy((int)(Math.random() * MAP_WIDTH), (int)(Math.random() * MAP_HEIGHT)));
                 diamondTimer = 0;
             }
         }
@@ -102,7 +108,7 @@ public class Game extends JPanel implements Runnable {
         if (seconds >= CIRCLE_START) {
             circleTimer++;
             if (circleTimer >= CIRCLE_SPAWN_RATE) {
-                enemies.add(new Enemy((int)(Math.random() * MAP_WIDTH), (int)(Math.random() * MAP_HEIGHT), Enemy.EnemyType.CIRCLE));
+                enemies.add(new CircleEnemy((int)(Math.random() * MAP_WIDTH), (int)(Math.random() * MAP_HEIGHT)));
                 circleTimer = 0;
             }
         }
@@ -110,7 +116,7 @@ public class Game extends JPanel implements Runnable {
         if (seconds >= HEALER_START) {
             healerTimer++;
             if (healerTimer >= HEALER_SPAWN_RATE) {
-                enemies.add(new Enemy((int)(Math.random() * MAP_WIDTH), (int)(Math.random() * MAP_HEIGHT), Enemy.EnemyType.HEALER));
+                enemies.add(new HealerEnemy((int)(Math.random() * MAP_WIDTH), (int)(Math.random() * MAP_HEIGHT)));
                 healerTimer = 0;
             }
         }
@@ -123,8 +129,14 @@ public class Game extends JPanel implements Runnable {
         player.update(MAP_WIDTH, MAP_HEIGHT);
         camera.update(player.getPosition().x, player.getPosition().y);
         spawnEnemies();
-        for (Enemy enemy : enemies) {
-            enemy.update(player, enemies);
+        coverManager.clear();
+        for (BaseEnemy enemy : enemies) {
+            // Use coverManager for SquareEnemy and similar
+            if (enemy instanceof SquareEnemy) {
+                ((SquareEnemy)enemy).update(player, enemies, coverManager);
+            } else {
+                enemy.update(player, enemies);
+            }
             // Enemy shooting logic
             java.util.List<Bullet> enemyBullets = enemy.shoot(player);
             if (enemyBullets != null) {
@@ -141,27 +153,27 @@ public class Game extends JPanel implements Runnable {
                 continue;
             }
 
-            for (Enemy enemy : enemies) {
-                if (enemy.isAlive() && bullet.isActive() &&
-                    bullet.getType() == BulletType.PLAYER &&
-                    bullet.getBounds().intersects(enemy.getBounds())) {
-                    enemy.takeDamage(bullet.getDamage());
-                    if (!enemy.isAlive()) {
-                        score += 100; // Add score for killing enemy
-                    }
-                    bullet.deactivate();
-                    bulletIterator.remove();
-                    break;
+        for (BaseEnemy enemy : enemies) {
+            if (enemy.isAlive() && bullet.isActive() &&
+                bullet.getType() == BulletType.PLAYER &&
+                bullet.getBounds().intersects(enemy.getBounds())) {
+                enemy.takeDamage(bullet.getDamage());
+                if (!enemy.isAlive()) {
+                    score += 100; // Add score for killing enemy
                 }
-                // Add logic for enemy bullets hitting the player
-                if (bullet.getType() == BulletType.ENEMY &&
-                    bullet.getBounds().intersects(player.getBounds())) {
-                    // player.takeDamage(bullet.getDamage());
-                    bullet.deactivate();
-                    bulletIterator.remove();
-                    break;
-                }
+                bullet.deactivate();
+                bulletIterator.remove();
+                break;
             }
+            // Add logic for enemy bullets hitting the player
+            if (bullet.getType() == BulletType.ENEMY &&
+                bullet.getBounds().intersects(player.getBounds())) {
+                // player.takeDamage(bullet.getDamage());
+                bullet.deactivate();
+                bulletIterator.remove();
+                break;
+            }
+        }
         }
 
         // Handle shooting
@@ -213,7 +225,7 @@ public class Game extends JPanel implements Runnable {
         if (playerDistance <= visibilityRadius) {
             player.draw(g, camera);
         }
-        for (Enemy enemy : enemies) {
+        for (BaseEnemy enemy : enemies) {
             double enemyDistance = enemy.getPosition().distance(camera.getX() + VIEWPORT_WIDTH / 2, camera.getY() + VIEWPORT_HEIGHT / 2);
             if (enemyDistance <= visibilityRadius) {
                 enemy.draw(g, camera);
