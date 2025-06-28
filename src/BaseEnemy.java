@@ -2,7 +2,8 @@ import java.awt.*;
 import java.util.List;
 
 public abstract class BaseEnemy {
-    protected int x, y, speed, health, maxHealth;
+    protected int x, y,speed;
+    protected float health, maxHealth;
     protected AIState state = AIState.IDLE;
     protected long lastShotTime = 0;
     protected static final long SHOOT_COOLDOWN = 1000;
@@ -32,7 +33,7 @@ public abstract class BaseEnemy {
         return new Point(x, y);
     }
 
-    public int getMaxHealth() {
+    public float getMaxHealth() {
         return maxHealth;
     }
 
@@ -42,7 +43,7 @@ public abstract class BaseEnemy {
 
     // Move towards (tx, ty) but avoid overlapping with other enemies
     protected void moveWithCollision(int tx, int ty, List<BaseEnemy> allEnemies) {
-        if (Math.abs(x - tx) < 2 && Math.abs(y - ty) < 2) return;
+        // if (Math.abs(x - tx) < 2 && Math.abs(y - ty) < 2) return;
 
         int[] dx = {0, speed, -speed, 0, 0, speed, -speed, speed, -speed};
         int[] dy = {0, 0, 0, speed, -speed, speed, speed, -speed, -speed};

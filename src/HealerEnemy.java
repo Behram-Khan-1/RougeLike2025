@@ -12,10 +12,12 @@ public class HealerEnemy extends BaseEnemy {
         if (target != null) {
             double dist = getPosition().distance(target.getPosition());
             // If close enough, heal
-            if (dist < 50) {
+            if (dist < 100) {
                 if (target.health < target.maxHealth) {
                     // Heal at 2 HP per second (assuming 60 FPS)
-                    target.health += 11 / 60.0;
+                    target.health += 3.0/60.0 ;
+                    System.out.println(1.0/60.0);
+                    
                     if (target.health > target.maxHealth) {
                         target.health = target.maxHealth;
                     }

@@ -48,59 +48,55 @@ public class SquareEnemy extends BaseEnemy {
             }
             return;
         }
-        if (dist < 200) {
-            state = AIState.CHASE;
-        } else {
-            state = AIState.IDLE;
+        // Always try to hide behind a diamond if possible
+        BaseEnemy bestDiamond = null;
+        double minCoverDist = Double.MAX_VALUE;
+        for (BaseEnemy e : allEnemies) {
+            if (e != this && e instanceof DiamondEnemy && e.isAlive() && coverManager.isDiamondAvailable(e)) {
+                double d = getPosition().distance(e.getPosition());
+                if (d < 80 && d < minCoverDist) {
+                    minCoverDist = d;
+                    bestDiamond = e;
+                }
+            }
         }
-        // Try to find a diamond to hide behind
-        if (state == AIState.CHASE && dist >= 100) {
-            BaseEnemy bestDiamond = null;
-            double minCoverDist = Double.MAX_VALUE;
-            for (BaseEnemy e : allEnemies) {
-                if (e != this && e instanceof DiamondEnemy && e.isAlive() && coverManager.isDiamondAvailable(e)) {
-                    double d = getPosition().distance(e.getPosition());
-                    if (d < 60 && d < minCoverDist) {
-                        minCoverDist = d;
-                        bestDiamond = e;
-                    }
-                }
+        if (bestDiamond != null) {
+            // Assign cover if not already assigned
+            if (currentCoverDiamond != bestDiamond) {
+                if (currentCoverDiamond != null) coverManager.removeCover(currentCoverDiamond);
+                coverManager.assignCover(bestDiamond, this);
+                currentCoverDiamond = bestDiamond;
             }
-            if (bestDiamond != null) {
-                // Assign cover if not already assigned
-                if (currentCoverDiamond != bestDiamond) {
-                    if (currentCoverDiamond != null) coverManager.removeCover(currentCoverDiamond);
-                    coverManager.assignCover(bestDiamond, this);
-                    currentCoverDiamond = bestDiamond;
-                    // Pick a fixed angle for this cover session
-                    double dx = bestDiamond.getPosition().x - player.x;
-                    double dy = bestDiamond.getPosition().y - player.y;
-                    double baseAngle = Math.atan2(dy, dx);
-                    fixedCoverAngle = baseAngle + Math.toRadians((Math.random() - 0.5) * 60);
-                }
-                // Move behind diamond at fixed angle
-                if (fixedCoverAngle == null) {
-                    double dx = bestDiamond.getPosition().x - player.x;
-                    double dy = bestDiamond.getPosition().y - player.y;
-                    double baseAngle = Math.atan2(dy, dx);
-                    fixedCoverAngle = baseAngle + Math.toRadians((Math.random() - 0.5) * 60);
-                }
-                int offsetX = (int)(Math.cos(fixedCoverAngle) * 30);
-                int offsetY = (int)(Math.sin(fixedCoverAngle) * 30);
-                moveWithCollision(bestDiamond.getPosition().x + offsetX, bestDiamond.getPosition().y + offsetY, allEnemies);
-                return;
-            } else if (currentCoverDiamond != null) {
-                coverManager.removeCover(currentCoverDiamond);
-                currentCoverDiamond = null;
-                fixedCoverAngle = null;
-            }
-            int wiggleX = (int)((Math.random() - 0.5) * 5);
-            int wiggleY = (int)((Math.random() - 0.5) * 5);
-            moveWithCollision(player.x + wiggleX, player.y + wiggleY, allEnemies);
+            // Always update cover angle to keep diamond between player and self
+            double dx = bestDiamond.getPosition().x - player.x;
+            double dy = bestDiamond.getPosition().y - player.y;
+            double baseAngle = Math.atan2(dy, dx);
+            // Add a small random offset to avoid stacking
+            double angleOffset = Math.toRadians((Math.random() - 0.5) * 60);
+            double coverAngle = baseAngle + angleOffset;
+            int offsetX = (int)(Math.cos(coverAngle) * 30);
+            int offsetY = (int)(Math.sin(coverAngle) * 30);
+            moveWithCollision(bestDiamond.getPosition().x + offsetX, bestDiamond.getPosition().y + offsetY, allEnemies);
+            fixedCoverAngle = coverAngle;
+            return;
         } else if (currentCoverDiamond != null) {
             coverManager.removeCover(currentCoverDiamond);
             currentCoverDiamond = null;
             fixedCoverAngle = null;
+        }
+        // Only chase player if within range, otherwise idle
+        double playerDist = player.getPosition().distance(x, y);
+        if (playerDist < 200) {
+            state = AIState.CHASE;
+            // Only move toward player if not too close
+            if (playerDist > 200) {
+                int wiggleX = (int)((Math.random() - 0.5) * 5);
+                int wiggleY = (int)((Math.random() - 0.5) * 5);
+                moveWithCollision(player.x + wiggleX, player.y + wiggleY, allEnemies);
+            }
+            // else: stay in place and shoot
+        } else {
+            state = AIState.IDLE;
         }
     }
 
@@ -139,7 +135,7 @@ public class SquareEnemy extends BaseEnemy {
         g.setColor(Color.GREEN);
         int healthBarWidth = (int)((health / (double)maxHealth) * 20);
         g.fillRect(screenX, screenY - 5, healthBarWidth, 3);
-        System.out.println("SquareEnemy health: " + health);
+        // System.out.println("SquareEnemy health: " + health);
     }
 
 }

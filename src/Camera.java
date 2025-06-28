@@ -1,5 +1,3 @@
-// === Camera.java ===
-import java.awt.Point;
 
 public class Camera {
     private float x, y;

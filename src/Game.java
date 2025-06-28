@@ -4,7 +4,6 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 // Modular enemy imports
 // (No explicit imports needed for same-package classes)
 
@@ -12,7 +11,7 @@ public class Game extends JPanel implements Runnable {
     // --- Enemy spawn timing (seconds) ---
     private static final int SQUARE_START = 0;
     private static final int DIAMOND_START = 0;
-    private static final int CIRCLE_START = 120;
+    private static final int CIRCLE_START = 0;
     private static final int HEALER_START = 0;
     private static final int DIAMOND_LOW_RATE_START = 40;
 
@@ -36,6 +35,7 @@ public class Game extends JPanel implements Runnable {
     private Camera camera;
 
     private boolean gameOver = false;
+    private Rectangle restartButtonBounds = new Rectangle();
 
     private int frameCount = 0;
     private int squareTimer = 0, diamondTimer = 0, circleTimer = 0, healerTimer = 0;
@@ -57,6 +57,16 @@ public class Game extends JPanel implements Runnable {
         enemies.add(new HealerEnemy(1100, 1100));
         camera = new Camera(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, MAP_WIDTH, MAP_HEIGHT);
         coverManager = new DiamondCoverManager();
+
+        // Mouse listener for restart button
+        addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent e) {
+                if (gameOver && restartButtonBounds.contains(e.getPoint())) {
+                    restartGame();
+                }
+            }
+        });
     }
 
     public void start() {
@@ -92,7 +102,6 @@ public class Game extends JPanel implements Runnable {
         }
     }
 
-
     private void spawnEnemies() {
         frameCount++;
         int seconds = frameCount / 60;
@@ -100,7 +109,7 @@ public class Game extends JPanel implements Runnable {
         if (seconds >= SQUARE_START) {
             squareTimer++;
             if (squareTimer >= SQUARE_SPAWN_RATE) {
-                enemies.add(new SquareEnemy((int)(Math.random() * MAP_WIDTH), (int)(Math.random() * MAP_HEIGHT)));
+                enemies.add(new SquareEnemy((int) (Math.random() * MAP_WIDTH), (int) (Math.random() * MAP_HEIGHT)));
                 squareTimer = 0;
             }
         }
@@ -109,7 +118,7 @@ public class Game extends JPanel implements Runnable {
             diamondTimer++;
             int rate = (seconds >= DIAMOND_LOW_RATE_START) ? DIAMOND_SPAWN_RATE : 600; // slower before 40s
             if (diamondTimer >= rate) {
-                enemies.add(new DiamondEnemy((int)(Math.random() * MAP_WIDTH), (int)(Math.random() * MAP_HEIGHT)));
+                enemies.add(new DiamondEnemy((int) (Math.random() * MAP_WIDTH), (int) (Math.random() * MAP_HEIGHT)));
                 diamondTimer = 0;
             }
         }
@@ -117,7 +126,7 @@ public class Game extends JPanel implements Runnable {
         if (seconds >= CIRCLE_START) {
             circleTimer++;
             if (circleTimer >= CIRCLE_SPAWN_RATE) {
-                enemies.add(new CircleEnemy((int)(Math.random() * MAP_WIDTH), (int)(Math.random() * MAP_HEIGHT)));
+                enemies.add(new CircleEnemy((int) (Math.random() * MAP_WIDTH), (int) (Math.random() * MAP_HEIGHT)));
                 circleTimer = 0;
             }
         }
@@ -125,7 +134,7 @@ public class Game extends JPanel implements Runnable {
         if (seconds >= HEALER_START) {
             healerTimer++;
             if (healerTimer >= HEALER_SPAWN_RATE) {
-                enemies.add(new HealerEnemy((int)(Math.random() * MAP_WIDTH), (int)(Math.random() * MAP_HEIGHT)));
+                enemies.add(new HealerEnemy((int) (Math.random() * MAP_WIDTH), (int) (Math.random() * MAP_HEIGHT)));
                 healerTimer = 0;
             }
         }
@@ -142,7 +151,7 @@ public class Game extends JPanel implements Runnable {
         for (BaseEnemy enemy : enemies) {
             // Use coverManager for SquareEnemy and similar
             if (enemy instanceof SquareEnemy) {
-                ((SquareEnemy)enemy).update(player, enemies, coverManager);
+                ((SquareEnemy) enemy).update(player, enemies, coverManager);
             } else {
                 enemy.update(player, enemies);
             }
@@ -162,27 +171,27 @@ public class Game extends JPanel implements Runnable {
                 continue;
             }
 
-        for (BaseEnemy enemy : enemies) {
-            if (enemy.isAlive() && bullet.isActive() &&
-                bullet.getType() == BulletType.PLAYER &&
-                bullet.getBounds().intersects(enemy.getBounds())) {
-                enemy.takeDamage(bullet.getDamage());
-                if (!enemy.isAlive()) {
-                    score += 100; // Add score for killing enemy
+            for (BaseEnemy enemy : enemies) {
+                if (enemy.isAlive() && bullet.isActive() &&
+                        bullet.getType() == BulletType.PLAYER &&
+                        bullet.getBounds().intersects(enemy.getBounds())) {
+                    enemy.takeDamage(bullet.getDamage());
+                    if (!enemy.isAlive()) {
+                        score += 100; // Add score for killing enemy
+                    }
+                    bullet.deactivate();
+                    bulletIterator.remove();
+                    break;
                 }
-                bullet.deactivate();
-                bulletIterator.remove();
-                break;
+                // Add logic for enemy bullets hitting the player
+                if (bullet.getType() == BulletType.ENEMY &&
+                        bullet.getBounds().intersects(player.getBounds())) {
+                    // player.takeDamage(bullet.getDamage());
+                    bullet.deactivate();
+                    bulletIterator.remove();
+                    break;
+                }
             }
-            // Add logic for enemy bullets hitting the player
-            if (bullet.getType() == BulletType.ENEMY &&
-                bullet.getBounds().intersects(player.getBounds())) {
-                // player.takeDamage(bullet.getDamage());
-                bullet.deactivate();
-                bulletIterator.remove();
-                break;
-            }
-        }
         }
 
         // Handle shooting
@@ -230,12 +239,14 @@ public class Game extends JPanel implements Runnable {
 
         // Draw game objects with camera offset
         double visibilityRadius = 400.0; // Define the visibility radius
-        double playerDistance = player.getPosition().distance(camera.getX() + VIEWPORT_WIDTH / 2, camera.getY() + VIEWPORT_HEIGHT / 2);
+        double playerDistance = player.getPosition().distance(camera.getX() + VIEWPORT_WIDTH / 2,
+                camera.getY() + VIEWPORT_HEIGHT / 2);
         if (playerDistance <= visibilityRadius) {
             player.draw(g, camera);
         }
         for (BaseEnemy enemy : enemies) {
-            double enemyDistance = enemy.getPosition().distance(camera.getX() + VIEWPORT_WIDTH / 2, camera.getY() + VIEWPORT_HEIGHT / 2);
+            double enemyDistance = enemy.getPosition().distance(camera.getX() + VIEWPORT_WIDTH / 2,
+                    camera.getY() + VIEWPORT_HEIGHT / 2);
             if (enemyDistance <= visibilityRadius) {
                 enemy.draw(g, camera);
             }
@@ -252,10 +263,46 @@ public class Game extends JPanel implements Runnable {
             int y = (VIEWPORT_HEIGHT - fm.getHeight()) / 2 + fm.getAscent();
             g.setColor(Color.RED);
             g.drawString(msg, x, y);
+
+            // Draw Restart button
+            String btnText = "Restart";
+            g.setFont(new Font("Arial", Font.BOLD, 36));
+            FontMetrics btnFM = g.getFontMetrics();
+            int btnWidth = btnFM.stringWidth(btnText) + 40;
+            int btnHeight = btnFM.getHeight() + 20;
+            int btnX = (VIEWPORT_WIDTH - btnWidth) / 2;
+            int btnY = y + 40;
+            restartButtonBounds.setBounds(btnX, btnY, btnWidth, btnHeight);
+            g.setColor(Color.LIGHT_GRAY);
+            g.fillRoundRect(btnX, btnY, btnWidth, btnHeight, 20, 20);
+            g.setColor(Color.BLACK);
+            g.drawRoundRect(btnX, btnY, btnWidth, btnHeight, 20, 20);
+            int textX = btnX + (btnWidth - btnFM.stringWidth(btnText)) / 2;
+            int textY = btnY + ((btnHeight - btnFM.getHeight()) / 2) + btnFM.getAscent();
+            g.drawString(btnText, textX, textY);
         }
+
+    }
+    // Resets all game state for a fresh restart
+    private void restartGame() {
+        player = new Player(500, 500);
+        enemies = new ArrayList<>();
+        bullets = new ArrayList<>();
+        enemies.add(new SquareEnemy(1000, 1000));
+        enemies.add(new HealerEnemy(1100, 1100));
+        camera = new Camera(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, MAP_WIDTH, MAP_HEIGHT);
+        coverManager = new DiamondCoverManager();
+        score = 0;
+        frameCount = 0;
+        squareTimer = 0;
+        diamondTimer = 0;
+        circleTimer = 0;
+        healerTimer = 0;
+        gameOver = false;
+        repaint();
     }
 }
 
 // if (player.health <= 0) {
-//     // Handle game over logic, e.g., display game over screen or restart game
+// // Handle game over logic, e.g., display game over screen or restart game
 // }
