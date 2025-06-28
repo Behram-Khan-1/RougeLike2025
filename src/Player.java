@@ -4,6 +4,8 @@ import java.awt.*;
 public class Player {
     int x, y, speed = 3;
     private int health = 100; // Add health attribute
+    private int coins = 100;
+
     public int getHealth() {
         return health;
     }
@@ -11,6 +13,10 @@ public class Player {
     public void setHealth(int health) {
         this.health = health;
     }
+
+    public int getCoins() { return coins; }
+    public void addCoins(int amount) { coins += amount; }
+    public void setCoins(int amount) { coins = amount; }
 
     public Player(int x, int y) {
         this.x = x;

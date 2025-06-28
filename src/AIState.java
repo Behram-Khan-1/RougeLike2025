@@ -4,5 +4,7 @@ public enum AIState {
     FLEE,
     DODGE,
     GROUP,
-    GUARD
+    GUARD,
+    ROAMING,
+    SCOUTING
 }

@@ -4,13 +4,16 @@ import java.util.List;
 // import DiamondCoverManager;
 
 public class SquareEnemy extends BaseEnemy {
-    public SquareEnemy(int x, int y) {
-        super(x, y, 100, 2);
-    }
-
-
     private BaseEnemy currentCoverDiamond = null;
     private Double fixedCoverAngle = null;
+    private Point roamTarget = null;
+    private long roamEndTime = 0;
+    private boolean scouting = false;
+
+    public SquareEnemy(int x, int y) {
+        super(x, y, 100, 2);
+        this.attackRange = 200; // Default for SquareEnemy
+    }
 
     // Main update method with cover manager
     public void update(Player player, List<BaseEnemy> allEnemies, DiamondCoverManager coverManager) {
@@ -60,6 +63,8 @@ public class SquareEnemy extends BaseEnemy {
                 }
             }
         }
+        long now = System.currentTimeMillis();
+        // If hiding behind diamond, check if player is in range
         if (bestDiamond != null) {
             // Assign cover if not already assigned
             if (currentCoverDiamond != bestDiamond) {
@@ -67,37 +72,104 @@ public class SquareEnemy extends BaseEnemy {
                 coverManager.assignCover(bestDiamond, this);
                 currentCoverDiamond = bestDiamond;
             }
-            // Always update cover angle to keep diamond between player and self
-            double dx = bestDiamond.getPosition().x - player.x;
-            double dy = bestDiamond.getPosition().y - player.y;
-            double baseAngle = Math.atan2(dy, dx);
-            // Add a small random offset to avoid stacking
-            double angleOffset = Math.toRadians((Math.random() - 0.5) * 60);
-            double coverAngle = baseAngle + angleOffset;
-            int offsetX = (int)(Math.cos(coverAngle) * 30);
-            int offsetY = (int)(Math.sin(coverAngle) * 30);
-            moveWithCollision(bestDiamond.getPosition().x + offsetX, bestDiamond.getPosition().y + offsetY, allEnemies);
-            fixedCoverAngle = coverAngle;
+            double playerDist = player.getPosition().distance(x, y);
+            if (playerDist < attackRange) {
+                state = AIState.CHASE;
+                // Use cover logic: keep diamond between self and player
+                double dx = bestDiamond.getPosition().x - player.x;
+                double dy = bestDiamond.getPosition().y - player.y;
+                double baseAngle = Math.atan2(dy, dx);
+                double angleOffset = Math.toRadians((Math.random() - 0.5) * 60);
+                double coverAngle = baseAngle + angleOffset;
+                int offsetX = (int)(Math.cos(coverAngle) * 30);
+                int offsetY = (int)(Math.sin(coverAngle) * 30);
+                moveWithCollision(bestDiamond.getPosition().x + offsetX, bestDiamond.getPosition().y + offsetY, allEnemies);
+                fixedCoverAngle = coverAngle;
+            } else {
+                state = AIState.ROAMING;
+                // If diamond is roaming/scouting, follow its target
+                Point diamondTarget = null;
+                if (bestDiamond instanceof DiamondEnemy) {
+                    try {
+                        java.lang.reflect.Field f = bestDiamond.getClass().getDeclaredField("roamTarget");
+                        f.setAccessible(true);
+                        diamondTarget = (Point)f.get(bestDiamond);
+                    } catch (Exception ex) { diamondTarget = null; }
+                }
+                if (diamondTarget != null) {
+                    moveWithCollision(diamondTarget.x, diamondTarget.y, allEnemies);
+                } else {
+                    // fallback: keep diamond between self and player
+                    double dx = bestDiamond.getPosition().x - player.x;
+                    double dy = bestDiamond.getPosition().y - player.y;
+                    double baseAngle = Math.atan2(dy, dx);
+                    double angleOffset = Math.toRadians((Math.random() - 0.5) * 60);
+                    double coverAngle = baseAngle + angleOffset;
+                    int offsetX = (int)(Math.cos(coverAngle) * 30);
+                    int offsetY = (int)(Math.sin(coverAngle) * 30);
+                    moveWithCollision(bestDiamond.getPosition().x + offsetX, bestDiamond.getPosition().y + offsetY, allEnemies);
+                    fixedCoverAngle = coverAngle;
+                }
+            }
             return;
         } else if (currentCoverDiamond != null) {
             coverManager.removeCover(currentCoverDiamond);
             currentCoverDiamond = null;
             fixedCoverAngle = null;
         }
-        // Only chase player if within range, otherwise idle
+        // Roaming/scouting logic
         double playerDist = player.getPosition().distance(x, y);
-        if (playerDist < 200) {
+        if (playerDist < attackRange) {
             state = AIState.CHASE;
-            // Only move toward player if not too close
-            if (playerDist > 200) {
+            roamTarget = null;
+            scouting = false;
+            // Only move toward player if outside attack range (keep distance)
+            if (playerDist > attackRange - 10) { // 10px buffer
                 int wiggleX = (int)((Math.random() - 0.5) * 5);
                 int wiggleY = (int)((Math.random() - 0.5) * 5);
-                moveWithCollision(player.x + wiggleX, player.y + wiggleY, allEnemies);
+                // Move to edge of attack range, not directly on player
+                double dx = player.x - x;
+                double dy = player.y - y;
+                double len = Math.sqrt(dx * dx + dy * dy);
+                if (len > 0) {
+                    dx /= len;
+                    dy /= len;
+                    int targetX = player.x - (int)(dx * (attackRange - 15));
+                    int targetY = player.y - (int)(dy * (attackRange - 15));
+                    moveWithCollision(targetX + wiggleX, targetY + wiggleY, allEnemies);
+                }
             }
             // else: stay in place and shoot
-        } else {
-            state = AIState.IDLE;
+            return;
         }
+        if (state == AIState.CHASE && playerDist >= attackRange) {
+            state = AIState.SCOUTING;
+            double angle = Math.random() * 2 * Math.PI;
+            int scoutX = player.x + (int)(Math.cos(angle) * attackRange);
+            int scoutY = player.y + (int)(Math.sin(angle) * attackRange);
+            scoutX = Math.max(0, Math.min(scoutX, 2000-20));
+            scoutY = Math.max(0, Math.min(scoutY, 1500-20));
+            roamTarget = new Point(scoutX, scoutY);
+            roamEndTime = now + 5000;
+            scouting = true;
+        }
+        if (state == AIState.SCOUTING && roamTarget != null) {
+            moveWithCollision(roamTarget.x, roamTarget.y, allEnemies);
+            if (now > roamEndTime || getPosition().distance(roamTarget) < 10) {
+                roamTarget = null;
+                scouting = false;
+                state = AIState.ROAMING;
+            }
+            return;
+        }
+        if (state != AIState.ROAMING || roamTarget == null || now > roamEndTime || getPosition().distance(roamTarget) < 10) {
+            int roamX = (int)(Math.random() * (2000-20));
+            int roamY = (int)(Math.random() * (1500-20));
+            roamTarget = new Point(roamX, roamY);
+            roamEndTime = now + 5000;
+            state = AIState.ROAMING;
+        }
+        moveWithCollision(roamTarget.x, roamTarget.y, allEnemies);
     }
 
     // Implement the required abstract method for compatibility, but delegate to the main update

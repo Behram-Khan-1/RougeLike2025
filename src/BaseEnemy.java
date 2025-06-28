@@ -2,11 +2,18 @@ import java.awt.*;
 import java.util.List;
 
 public abstract class BaseEnemy {
-    protected int x, y,speed;
+    protected int x, y, speed;
     protected float health, maxHealth;
     protected AIState state = AIState.IDLE;
     protected long lastShotTime = 0;
     protected static final long SHOOT_COOLDOWN = 1000;
+    protected int attackRange = 200; // Default, can be overridden per enemy
+    protected int coinValue = 1; // Default, can be overridden per enemy
+
+    public int getAttackRange() { return attackRange; }
+    public void setAttackRange(int range) { this.attackRange = range; }
+    public int getCoinValue() { return coinValue; }
+    public void setCoinValue(int value) { this.coinValue = value; }
 
     public BaseEnemy(int x, int y, int maxHealth, int speed) {
         this.x = x;
