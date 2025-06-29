@@ -7,8 +7,9 @@ public class CircleEnemy extends BaseEnemy {
     private boolean scouting = false;
 
     public CircleEnemy(int x, int y) {
-        super(x, y, 80, 2);
+        super(x, y, 60, 2);
         this.attackRange = 300; // Default for CircleEnemy
+        setCoinValue(4);
     }
 
     @Override
@@ -61,6 +62,56 @@ public class CircleEnemy extends BaseEnemy {
         moveWithCollision(roamTarget.x, roamTarget.y, allEnemies);
     }
 
+    // Overload for wall-aware navigation
+    public void update(Player player, List<BaseEnemy> allEnemies, java.util.List<Wall> walls) {
+        double dist = player.getPosition().distance(x, y);
+        long now = System.currentTimeMillis();
+        // If player in range, chase
+        if (dist < 350) {
+            state = AIState.CHASE;
+            roamTarget = null;
+            scouting = false;
+            if (dist >= 100) {
+                int wiggleX = (int)((Math.random() - 0.5) * 5);
+                int wiggleY = (int)((Math.random() - 0.5) * 5);
+                moveWithCollision(player.x + wiggleX, player.y + wiggleY, allEnemies, walls);
+            }
+            return;
+        }
+        // If just lost player, do a scouting move near player
+        if (state == AIState.CHASE && dist >= 350) {
+            state = AIState.SCOUTING;
+            double angle = Math.random() * 2 * Math.PI;
+            int scoutX = player.x + (int)(Math.cos(angle) * 200);
+            int scoutY = player.y + (int)(Math.sin(angle) * 200);
+            scoutX = Math.max(0, Math.min(scoutX, 2000-20));
+            scoutY = Math.max(0, Math.min(scoutY, 1500-20));
+            roamTarget = new Point(scoutX, scoutY);
+            roamEndTime = now + 5000;
+            scouting = true;
+        }
+        // Roaming or scouting
+        if (state == AIState.SCOUTING && roamTarget != null) {
+            moveWithCollision(roamTarget.x, roamTarget.y, allEnemies, walls);
+            if (now > roamEndTime || getPosition().distance(roamTarget) < 10) {
+                roamTarget = null;
+                scouting = false;
+                state = AIState.ROAMING;
+            }
+            return;
+        }
+        if (state != AIState.ROAMING || roamTarget == null || now > roamEndTime || getPosition().distance(roamTarget) < 10) {
+            // Pick new roam target
+            int roamX = (int)(Math.random() * (2000-20));
+            int roamY = (int)(Math.random() * (1500-20));
+            roamTarget = new Point(roamX, roamY);
+            roamEndTime = now + 5000;
+            state = AIState.ROAMING;
+        }
+        // Move toward roam target
+        moveWithCollision(roamTarget.x, roamTarget.y, allEnemies, walls);
+    }
+
     @Override
     public java.util.List<Bullet> shoot(Player player) {
         if (!isAlive() || state != AIState.CHASE) return null;
@@ -80,7 +131,10 @@ public class CircleEnemy extends BaseEnemy {
         for (double a : angles) {
             double ddx = Math.cos(a);
             double ddy = Math.sin(a);
-            bullets.add(new Bullet(x + 10, y + 10, ddx, ddy, BulletType.ENEMY));
+            Bullet b = new Bullet(x + 10, y + 10, ddx, ddy, BulletType.ENEMY);
+            b.setDamage(this.getDamage());
+            bullets.add(b);
+            System.out.println("CircleEnemy bullet damage: " + this.getDamage());
         }
         return bullets;
     }

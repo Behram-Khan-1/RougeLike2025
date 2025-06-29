@@ -65,5 +65,15 @@ public class Chest {
         if (rarity == Rarity.RARE) label = "R";
         if (rarity == Rarity.SUPER_RARE) label = "S";
         g.drawString(label, sx + 8, sy + 19);
+
+        // Draw coin cost above the chest
+        int coinCost = getCoinCost(rarity);
+        String costText = coinCost + " coins";
+        g.setFont(new Font("Arial", Font.PLAIN, 11));
+        int costTextWidth = g.getFontMetrics().stringWidth(costText);
+        int costTextX = sx + (SIZE - costTextWidth) / 2;
+        int costTextY = sy - 6;
+        g.setColor(Color.YELLOW);
+        g.drawString(costText, costTextX, costTextY);
     }
 }

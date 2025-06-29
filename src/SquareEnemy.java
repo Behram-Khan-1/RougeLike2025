@@ -13,10 +13,12 @@ public class SquareEnemy extends BaseEnemy {
     public SquareEnemy(int x, int y) {
         super(x, y, 100, 2);
         this.attackRange = 200; // Default for SquareEnemy
+        setCoinValue(2);
     }
 
-    // Main update method with cover manager
-    public void update(Player player, List<BaseEnemy> allEnemies, DiamondCoverManager coverManager) {
+    // Main update method for game loop: always use this
+    public void update(Player player, List<BaseEnemy> allEnemies, DiamondCoverManager coverManager, java.util.List<Wall> walls) {
+        // (All logic here, using coverManager and walls, but check for null)
         double dist = player.getPosition().distance(x, y);
         boolean lowHP = health < 0.3 * maxHealth;
         BaseEnemy nearestHealer = null;
@@ -42,7 +44,10 @@ public class SquareEnemy extends BaseEnemy {
                 tx = x + (int)(dx * speed);
                 ty = y + (int)(dy * speed);
             }
-            moveWithCollision(tx, ty, allEnemies);
+            if (walls != null)
+                moveWithCollision(tx, ty, allEnemies, walls);
+            else
+                moveWithCollision(tx, ty, allEnemies);
             // Remove cover if fleeing
             if (currentCoverDiamond != null && coverManager != null) {
                 coverManager.removeCover(currentCoverDiamond);
@@ -55,7 +60,7 @@ public class SquareEnemy extends BaseEnemy {
         BaseEnemy bestDiamond = null;
         double minCoverDist = Double.MAX_VALUE;
         for (BaseEnemy e : allEnemies) {
-            if (e != this && e instanceof DiamondEnemy && e.isAlive() && coverManager.isDiamondAvailable(e)) {
+            if (e != this && e instanceof DiamondEnemy && e.isAlive() && (coverManager == null || coverManager.isDiamondAvailable(e))) {
                 double d = getPosition().distance(e.getPosition());
                 if (d < 80 && d < minCoverDist) {
                     minCoverDist = d;
@@ -67,7 +72,7 @@ public class SquareEnemy extends BaseEnemy {
         // If hiding behind diamond, check if player is in range
         if (bestDiamond != null) {
             // Assign cover if not already assigned
-            if (currentCoverDiamond != bestDiamond) {
+            if (currentCoverDiamond != bestDiamond && coverManager != null) {
                 if (currentCoverDiamond != null) coverManager.removeCover(currentCoverDiamond);
                 coverManager.assignCover(bestDiamond, this);
                 currentCoverDiamond = bestDiamond;
@@ -83,7 +88,10 @@ public class SquareEnemy extends BaseEnemy {
                 double coverAngle = baseAngle + angleOffset;
                 int offsetX = (int)(Math.cos(coverAngle) * 30);
                 int offsetY = (int)(Math.sin(coverAngle) * 30);
-                moveWithCollision(bestDiamond.getPosition().x + offsetX, bestDiamond.getPosition().y + offsetY, allEnemies);
+                if (walls != null)
+                    moveWithCollision(bestDiamond.getPosition().x + offsetX, bestDiamond.getPosition().y + offsetY, allEnemies, walls);
+                else
+                    moveWithCollision(bestDiamond.getPosition().x + offsetX, bestDiamond.getPosition().y + offsetY, allEnemies);
                 fixedCoverAngle = coverAngle;
             } else {
                 state = AIState.ROAMING;
@@ -97,7 +105,10 @@ public class SquareEnemy extends BaseEnemy {
                     } catch (Exception ex) { diamondTarget = null; }
                 }
                 if (diamondTarget != null) {
-                    moveWithCollision(diamondTarget.x, diamondTarget.y, allEnemies);
+                    if (walls != null)
+                        moveWithCollision(diamondTarget.x, diamondTarget.y, allEnemies, walls);
+                    else
+                        moveWithCollision(diamondTarget.x, diamondTarget.y, allEnemies);
                 } else {
                     // fallback: keep diamond between self and player
                     double dx = bestDiamond.getPosition().x - player.x;
@@ -107,12 +118,15 @@ public class SquareEnemy extends BaseEnemy {
                     double coverAngle = baseAngle + angleOffset;
                     int offsetX = (int)(Math.cos(coverAngle) * 30);
                     int offsetY = (int)(Math.sin(coverAngle) * 30);
-                    moveWithCollision(bestDiamond.getPosition().x + offsetX, bestDiamond.getPosition().y + offsetY, allEnemies);
+                    if (walls != null)
+                        moveWithCollision(bestDiamond.getPosition().x + offsetX, bestDiamond.getPosition().y + offsetY, allEnemies, walls);
+                    else
+                        moveWithCollision(bestDiamond.getPosition().x + offsetX, bestDiamond.getPosition().y + offsetY, allEnemies);
                     fixedCoverAngle = coverAngle;
                 }
             }
             return;
-        } else if (currentCoverDiamond != null) {
+        } else if (currentCoverDiamond != null && coverManager != null) {
             coverManager.removeCover(currentCoverDiamond);
             currentCoverDiamond = null;
             fixedCoverAngle = null;
@@ -136,7 +150,10 @@ public class SquareEnemy extends BaseEnemy {
                     dy /= len;
                     int targetX = player.x - (int)(dx * (attackRange - 15));
                     int targetY = player.y - (int)(dy * (attackRange - 15));
-                    moveWithCollision(targetX + wiggleX, targetY + wiggleY, allEnemies);
+                    if (walls != null)
+                        moveWithCollision(targetX + wiggleX, targetY + wiggleY, allEnemies, walls);
+                    else
+                        moveWithCollision(targetX + wiggleX, targetY + wiggleY, allEnemies);
                 }
             }
             // else: stay in place and shoot
@@ -150,33 +167,44 @@ public class SquareEnemy extends BaseEnemy {
             scoutX = Math.max(0, Math.min(scoutX, 2000-20));
             scoutY = Math.max(0, Math.min(scoutY, 1500-20));
             roamTarget = new Point(scoutX, scoutY);
-            roamEndTime = now + 5000;
+            roamEndTime = System.currentTimeMillis() + 5000;
             scouting = true;
         }
         if (state == AIState.SCOUTING && roamTarget != null) {
-            moveWithCollision(roamTarget.x, roamTarget.y, allEnemies);
-            if (now > roamEndTime || getPosition().distance(roamTarget) < 10) {
+            if (walls != null)
+                moveWithCollision(roamTarget.x, roamTarget.y, allEnemies, walls);
+            else
+                moveWithCollision(roamTarget.x, roamTarget.y, allEnemies);
+            if (System.currentTimeMillis() > roamEndTime || getPosition().distance(roamTarget) < 10) {
                 roamTarget = null;
                 scouting = false;
                 state = AIState.ROAMING;
             }
             return;
         }
-        if (state != AIState.ROAMING || roamTarget == null || now > roamEndTime || getPosition().distance(roamTarget) < 10) {
+        if (state != AIState.ROAMING || roamTarget == null || System.currentTimeMillis() > roamEndTime || getPosition().distance(roamTarget) < 10) {
             int roamX = (int)(Math.random() * (2000-20));
             int roamY = (int)(Math.random() * (1500-20));
             roamTarget = new Point(roamX, roamY);
-            roamEndTime = now + 5000;
+            roamEndTime = System.currentTimeMillis() + 5000;
             state = AIState.ROAMING;
         }
-        moveWithCollision(roamTarget.x, roamTarget.y, allEnemies);
+        if (walls != null)
+            moveWithCollision(roamTarget.x, roamTarget.y, allEnemies, walls);
+        else
+            moveWithCollision(roamTarget.x, roamTarget.y, allEnemies);
     }
 
-    // Implement the required abstract method for compatibility, but delegate to the main update
+    // Overloads for compatibility
+    public void update(Player player, List<BaseEnemy> allEnemies, DiamondCoverManager coverManager) {
+        update(player, allEnemies, coverManager, null);
+    }
+    public void update(Player player, List<BaseEnemy> allEnemies, java.util.List<Wall> walls) {
+        update(player, allEnemies, null, walls);
+    }
     @Override
     public void update(Player player, List<BaseEnemy> allEnemies) {
-        // If you call this version, it will not use cover logic
-        update(player, allEnemies, null);
+        update(player, allEnemies, null, null);
     }
 
     @Override
@@ -193,7 +221,9 @@ public class SquareEnemy extends BaseEnemy {
             dx /= length;
             dy /= length;
         }
-        bullets.add(new Bullet(x + 10, y + 10, dx, dy, BulletType.ENEMY));
+        Bullet b = new Bullet(x + 10, y + 10, dx, dy, BulletType.ENEMY);
+        b.setDamage(this.getDamage());
+        bullets.add(b);
         return bullets;
     }
 

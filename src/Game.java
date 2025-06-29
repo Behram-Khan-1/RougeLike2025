@@ -4,6 +4,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.Iterator;
+// Modular manager imports
+
 // Modular enemy imports
 // (No explicit imports needed for same-package classes)
 
@@ -11,44 +13,43 @@ import java.util.List;
 import java.util.Random;
 
 public class Game extends JPanel implements Runnable {
-    
-
-    private ArrayList<Chest> chests;
+    private WallManager wallManager;
+    private ChestManager chestManager;
     // Chest opening UI state
     private boolean chestUIActive = false;
     private String chestPowerupName = "";
     private String chestPowerupDesc = "";
     private long chestUITextTime = 0;
     private long lastChestSpawnTime = 0;
-    private static final long CHEST_SPAWN_INTERVAL = 1000; // 15 seconds
+    private static final long CHEST_SPAWN_INTERVAL = 15000; // 15 seconds
     private static final double RARE_RATE = 0.15;
     private static final double SUPER_RARE_RATE = 0.05;
     // Debug flag
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = true;
     // --- Enemy spawn timing (seconds) ---
-    private static final int SQUARE_START = 110;
-    private static final int DIAMOND_START = 110;
-    private static final int CIRCLE_START = 110;
-    private static final int HEALER_START =110;
-    private static final int DIAMOND_LOW_RATE_START = 40;
+    public static final int SQUARE_START = 0;
+    public static final int DIAMOND_START = 30;
+    public static final int CIRCLE_START = 60;
+    public static final int HEALER_START = 60;
+    public static final int DIAMOND_LOW_RATE_START = 40;
 
     // --- Spawn rates (frames) ---
-    private static final int SQUARE_SPAWN_RATE = 120; // every 2s
-    private static final int DIAMOND_SPAWN_RATE = 300; // every 5s (after 40s)
-    private static final int CIRCLE_SPAWN_RATE = 240; // every 4s
-    private static final int HEALER_SPAWN_RATE = 600; // every 10s
+    public static final int SQUARE_SPAWN_RATE = 120; // every 2s
+    public static final int DIAMOND_SPAWN_RATE = 800; // every 5s (after 40s)
+    public static final int CIRCLE_SPAWN_RATE = 420; // every 4s
+    public static final int HEALER_SPAWN_RATE = 600; // every 10s
     private int score = 0;
     private Thread gameThread;
     private boolean running = false;
 
-    private static final int MAP_WIDTH = 2000;
-    private static final int MAP_HEIGHT = 1500;
-    private static final int VIEWPORT_WIDTH = 1200;
-    private static final int VIEWPORT_HEIGHT = 1000;
+    public static final int MAP_WIDTH = 2000;
+    public static final int MAP_HEIGHT = 1500;
+    public static final int VIEWPORT_WIDTH = 1200;
+    public static final int VIEWPORT_HEIGHT = 1000;
 
     private Player player;
-    private ArrayList<BaseEnemy> enemies;
-    private ArrayList<Bullet> bullets;
+    private EnemyManager enemyManager;
+    private BulletManager bulletManager;
     private ArrayList<Coin> coins;
     private Camera camera;
 
@@ -60,7 +61,35 @@ public class Game extends JPanel implements Runnable {
 
     private DiamondCoverManager coverManager;
 
+    // Enemy scaling configuration
+    public double ENEMY_HP_SCALE = 1.0;
+    public double ENEMY_DMG_SCALE = 1.0;
+    public int ENEMY_SCALE_INTERVAL = 15; // seconds
+    public double ENEMY_HP_PER_INTERVAL = 0.05; // +15% HP per interval
+    public double ENEMY_DMG_PER_INTERVAL = 0.05; // +10% damage per interval
+    // Per-type base values (can be changed)
+    public int SQUARE_BASE_HP = 100;
+    public double SQUARE_BASE_DMG = 10;
+    public int DIAMOND_BASE_HP = 200;
+    public double DIAMOND_BASE_DMG = 6;
+    public int CIRCLE_BASE_HP = 60;
+    public double CIRCLE_BASE_DMG = 12;
+    public int HEALER_BASE_HP = 120;
+    public double HEALER_BASE_DMG = 0;
+
+    private UIManager uiManager;
+
     public Game() {
+        wallManager = new WallManager();
+        // Procedural wall generation
+        int numWalls = 6 + (int) (Math.random() * 3); // 6-8 walls
+        for (int i = 0; i < numWalls; i++) {
+            int w = 60 + (int) (Math.random() * 80); // 60-140 px
+            int h = 60 + (int) (Math.random() * 80);
+            int x = 100 + (int) (Math.random() * (MAP_WIDTH - w - 200));
+            int y = 100 + (int) (Math.random() * (MAP_HEIGHT - h - 200));
+            wallManager.addWall(new Wall(x, y, w, h));
+        }
         setPreferredSize(new Dimension(VIEWPORT_WIDTH, VIEWPORT_HEIGHT));
         setBackground(Color.BLACK);
         setFocusable(true);
@@ -69,21 +98,27 @@ public class Game extends JPanel implements Runnable {
         addMouseListener(input.getMouseAdapter());
         addMouseMotionListener(input.getMouseAdapter());
         player = new Player(500, 500);
-        enemies = new ArrayList<>();
-        bullets = new ArrayList<>();
+        enemyManager = new EnemyManager(this);
+        bulletManager = new BulletManager();
         coins = new ArrayList<>();
-        chests = new ArrayList<>();
+        chestManager = new ChestManager();
         lastChestSpawnTime = System.currentTimeMillis();
-
-                enemies.add(new SquareEnemy(1000, 1000));
-        // enemies.add(new SquareEnemy(1200, 1000));
-        // enemies.add(new SquareEnemy(1300, 1000));
-        enemies.add(new DiamondEnemy(1050, 1000));
-        // enemies.add(new CircleEnemy(1250, 1000));
-        // enemies.add(new CircleEnemy(1150, 1000));
-        // enemies.add(new HealerEnemy(1100, 1100));
+        SquareEnemy sq = new SquareEnemy(1000, 1000);
+        sq.setDamage((int) SQUARE_BASE_DMG);
+        enemyManager.getEnemies().add(sq);
+        // enemyManager.getEnemies().add(new SquareEnemy(1200, 1000));
+        // enemyManager.getEnemies().add(new SquareEnemy(1300, 1000));
+        DiamondEnemy de = new DiamondEnemy(1050, 1000);
+        de.setDamage((int) DIAMOND_BASE_DMG);
+        enemyManager.getEnemies().add(de);
+        CircleEnemy ce = new CircleEnemy(1250, 1000);
+        ce.setDamage((int) CIRCLE_BASE_DMG);
+        enemyManager.getEnemies().add(ce);
+        // enemyManager.getEnemies().add(new CircleEnemy(1150, 1000));
+        enemyManager.getEnemies().add(new HealerEnemy(1100, 1100));
         camera = new Camera(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, MAP_WIDTH, MAP_HEIGHT);
         coverManager = new DiamondCoverManager();
+        uiManager = new UIManager(this);
 
         // Mouse listener for restart button
         addMouseListener(new java.awt.event.MouseAdapter() {
@@ -100,16 +135,18 @@ public class Game extends JPanel implements Runnable {
         // Pick rarity
         double r = Math.random();
         Chest.Rarity rarity = Chest.Rarity.NORMAL;
-        if (r < SUPER_RARE_RATE) rarity = Chest.Rarity.SUPER_RARE;
-        else if (r < RARE_RATE + SUPER_RARE_RATE) rarity = Chest.Rarity.RARE;
+        if (r < SUPER_RARE_RATE)
+            rarity = Chest.Rarity.SUPER_RARE;
+        else if (r < RARE_RATE + SUPER_RARE_RATE)
+            rarity = Chest.Rarity.RARE;
         // Pick random position not too close to player, and within viewport
         int margin = 60;
         int cx, cy;
         do {
-            cx = (int)(camera.getX() + margin + Math.random() * (VIEWPORT_WIDTH - 2 * margin - 28));
-            cy = (int)(camera.getY() + margin + Math.random() * (VIEWPORT_HEIGHT - 2 * margin - 28));
+            cx = (int) (camera.getX() + margin + Math.random() * (VIEWPORT_WIDTH - 2 * margin - 28));
+            cy = (int) (camera.getY() + margin + Math.random() * (VIEWPORT_HEIGHT - 2 * margin - 28));
         } while (player.getPosition().distance(cx, cy) < 100);
-        chests.add(new Chest(cx, cy, rarity));
+        chestManager.addChest(new Chest(cx, cy, rarity));
     }
 
     public void start() {
@@ -145,48 +182,72 @@ public class Game extends JPanel implements Runnable {
         }
     }
 
-    private void spawnEnemies() {
-        frameCount++;
-        int seconds = frameCount / 60;
-        // SQUARE
-        if (seconds >= SQUARE_START) {
-            squareTimer++;
-            if (squareTimer >= SQUARE_SPAWN_RATE) {
-                enemies.add(new SquareEnemy((int) (Math.random() * MAP_WIDTH), (int) (Math.random() * MAP_HEIGHT)));
-                squareTimer = 0;
-            }
-        }
-        // DIAMOND
-        if (seconds >= DIAMOND_START) {
-            diamondTimer++;
-            int rate = (seconds >= DIAMOND_LOW_RATE_START) ? DIAMOND_SPAWN_RATE : 600; // slower before 40s
-            if (diamondTimer >= rate) {
-                enemies.add(new DiamondEnemy((int) (Math.random() * MAP_WIDTH), (int) (Math.random() * MAP_HEIGHT)));
-                diamondTimer = 0;
-            }
-        }
-        // CIRCLE
-        if (seconds >= CIRCLE_START) {
-            circleTimer++;
-            if (circleTimer >= CIRCLE_SPAWN_RATE) {
-                enemies.add(new CircleEnemy((int) (Math.random() * MAP_WIDTH), (int) (Math.random() * MAP_HEIGHT)));
-                circleTimer = 0;
-            }
-        }
-        // HEALER
-        if (seconds >= HEALER_START) {
-            healerTimer++;
-            if (healerTimer >= HEALER_SPAWN_RATE) {
-                enemies.add(new HealerEnemy((int) (Math.random() * MAP_WIDTH), (int) (Math.random() * MAP_HEIGHT)));
-                healerTimer = 0;
-            }
+    private int lastScaleStep = 0;
+
+    public void updateEnemyBaseStats(int seconds) {
+        int scaleSteps = seconds / ENEMY_SCALE_INTERVAL;
+        if (scaleSteps > lastScaleStep) {
+            // Only update if we've reached a new interval
+            SQUARE_BASE_HP = (int) (SQUARE_BASE_HP * (1.0 + ENEMY_HP_PER_INTERVAL));
+            SQUARE_BASE_DMG = (SQUARE_BASE_DMG * (1.0 + ENEMY_DMG_PER_INTERVAL));
+            DIAMOND_BASE_HP = (int) (DIAMOND_BASE_HP * (1.0 + ENEMY_HP_PER_INTERVAL));
+            DIAMOND_BASE_DMG = (DIAMOND_BASE_DMG * (1.0 + ENEMY_DMG_PER_INTERVAL));
+            CIRCLE_BASE_HP = (int) (CIRCLE_BASE_HP * (1.0 + ENEMY_HP_PER_INTERVAL));
+            CIRCLE_BASE_DMG = (CIRCLE_BASE_DMG * (1.0 + ENEMY_DMG_PER_INTERVAL));
+            HEALER_BASE_HP = (int) (HEALER_BASE_HP * (1.0 + ENEMY_HP_PER_INTERVAL));
+            HEALER_BASE_DMG = (int) (HEALER_BASE_DMG * (1.0 + ENEMY_DMG_PER_INTERVAL));
+            lastScaleStep = scaleSteps;
         }
     }
 
+    private void spawnEnemies() {
+        enemyManager.update();
+    }
+
     private void update() {
+        // Prevent player from moving through walls
+        Rectangle playerRect = player.getBounds();
+        for (Wall wall : wallManager.getWalls()) {
+            if (playerRect.intersects(wall.getBounds())) {
+                Rectangle wr = wall.getBounds();
+                if (player.x + 20 > wr.x && player.x < wr.x + wr.width) {
+                    if (player.y < wr.y)
+                        player.y = wr.y - 20;
+                    else
+                        player.y = wr.y + wr.height;
+                }
+                if (player.y + 20 > wr.y && player.y < wr.y + wr.height) {
+                    if (player.x < wr.x)
+                        player.x = wr.x - 20;
+                    else
+                        player.x = wr.x + wr.width;
+                }
+            }
+        }
+        // Prevent enemies from moving through walls
+        for (BaseEnemy enemy : enemyManager.getEnemies()) {
+            Rectangle er = enemy.getBounds();
+            for (Wall wall : wallManager.getWalls()) {
+                if (er.intersects(wall.getBounds())) {
+                    Rectangle wr = wall.getBounds();
+                    if (enemy.getPosition().x + 20 > wr.x && enemy.getPosition().x < wr.x + wr.width) {
+                        if (enemy.getPosition().y < wr.y)
+                            enemy.getPosition().y = wr.y - 20;
+                        else
+                            enemy.getPosition().y = wr.y + wr.height;
+                    }
+                    if (enemy.getPosition().y + 20 > wr.y && enemy.getPosition().y < wr.y + wr.height) {
+                        if (enemy.getPosition().x < wr.x)
+                            enemy.getPosition().x = wr.x - 20;
+                        else
+                            enemy.getPosition().x = wr.x + wr.width;
+                    }
+                }
+            }
+        }
         // Chest despawn and flicker logic
         long now = System.currentTimeMillis();
-        Iterator<Chest> chestItDespawn = chests.iterator();
+        Iterator<Chest> chestItDespawn = chestManager.getChests().iterator();
         while (chestItDespawn.hasNext()) {
             Chest chest = chestItDespawn.next();
             long alive = now - chest.spawnTime;
@@ -195,7 +256,7 @@ public class Game extends JPanel implements Runnable {
             }
         }
         // Chest opening logic (no pause)
-        Iterator<Chest> chestIt = chests.iterator();
+        Iterator<Chest> chestIt = chestManager.getChests().iterator();
         while (chestIt.hasNext()) {
             Chest chest = chestIt.next();
             if (!chest.opened && chest.getBounds().intersects(player.getBounds())) {
@@ -232,54 +293,10 @@ public class Game extends JPanel implements Runnable {
         player.update(MAP_WIDTH, MAP_HEIGHT);
         camera.update(player.getPosition().x, player.getPosition().y);
         spawnEnemies();
-        coverManager.clear();
-        for (BaseEnemy enemy : enemies) {
-            // Use coverManager for SquareEnemy and similar
-            if (enemy instanceof SquareEnemy) {
-                ((SquareEnemy) enemy).update(player, enemies, coverManager);
-            } else {
-                enemy.update(player, enemies);
-            }
-            // Enemy shooting logic
-            java.util.List<Bullet> enemyBullets = enemy.shoot(player);
-            if (enemyBullets != null) {
-                bullets.addAll(enemyBullets);
-            }
-        }
+        enemyManager.updateEnemies(player, coverManager, wallManager.getWalls(), bulletManager.getBullets());
 
-        // Handle bullet updates and collisions
-        Iterator<Bullet> bulletIterator = bullets.iterator();
-        while (bulletIterator.hasNext()) {
-            Bullet bullet = bulletIterator.next();
-            if (!bullet.update()) {
-                bulletIterator.remove();
-                continue;
-            }
-
-            for (BaseEnemy enemy : enemies) {
-                if (enemy.isAlive() && bullet.isActive() &&
-                        bullet.getType() == BulletType.PLAYER &&
-                        bullet.getBounds().intersects(enemy.getBounds())) {
-                    enemy.takeDamage(bullet.getDamage());
-                    if (!enemy.isAlive()) {
-                        score += 100; // Add score for killing enemy
-                        // Drop coin(s) on enemy death
-                        coins.add(new Coin(enemy.getPosition().x, enemy.getPosition().y, enemy.getCoinValue()));
-                    }
-                    bullet.deactivate();
-                    bulletIterator.remove();
-                    break;
-                }
-                // Add logic for enemy bullets hitting the player
-                if (bullet.getType() == BulletType.ENEMY &&
-                        bullet.getBounds().intersects(player.getBounds())) {
-                    // player.takeDamage(bullet.getDamage());
-                    bullet.deactivate();
-                    bulletIterator.remove();
-                    break;
-                }
-            }
-        }
+        // Handle bullet updates and collisions via BulletManager
+        bulletManager.updateBullets(player, enemyManager.getEnemies(), wallManager.getWalls(), coins, this);
 
         // Handle coin pickup
         Iterator<Coin> coinIterator = coins.iterator();
@@ -294,13 +311,11 @@ public class Game extends JPanel implements Runnable {
 
         // Handle shooting
         if (InputHandler.mousePressed && InputHandler.shootCooldown <= 0) {
-            bullets.add(player.shootAtMouse(camera));
+            bulletManager.addBullet(player.shootAtMouse(camera));
             InputHandler.shootCooldown = 15;
         } else if (InputHandler.shootCooldown > 0) {
             InputHandler.shootCooldown--;
         }
-
-        bullets.removeIf(b -> !b.update());
 
         // Check for game over
         if (player.getHealth() <= 0) {
@@ -310,50 +325,32 @@ public class Game extends JPanel implements Runnable {
     }
 
     public void paintComponent(Graphics g) {
-        long now = System.currentTimeMillis();
         super.paintComponent(g);
+        // Draw walls
+        for (Wall wall : wallManager.getWalls())
+            wall.draw(g, camera);
         // Draw chest powerup UI at top center if active
         if (chestUIActive) {
             String title = "Powerup: " + chestPowerupName;
             String desc = chestPowerupDesc;
-            g.setColor(new Color(0,0,0,180));
-            g.fillRect(VIEWPORT_WIDTH/2-250, 40, 500, 90);
+            g.setColor(new Color(0, 0, 0, 180));
+            g.fillRect(VIEWPORT_WIDTH / 2 - 250, 40, 500, 90);
             g.setColor(Color.WHITE);
             g.setFont(new Font("Arial", Font.BOLD, 28));
             FontMetrics fm = g.getFontMetrics();
-            int tx = VIEWPORT_WIDTH/2 - fm.stringWidth(title)/2;
+            int tx = VIEWPORT_WIDTH / 2 - fm.stringWidth(title) / 2;
             g.drawString(title, tx, 80);
             g.setFont(new Font("Arial", Font.PLAIN, 20));
             fm = g.getFontMetrics();
-            int dx = VIEWPORT_WIDTH/2 - fm.stringWidth(desc)/2;
+            int dx = VIEWPORT_WIDTH / 2 - fm.stringWidth(desc) / 2;
             g.drawString(desc, dx, 110);
         }
 
-        // Draw score at top right
-        g.setFont(new Font("Arial", Font.BOLD, 24));
-        String scoreText = "Score: " + score;
-        FontMetrics fmScore = g.getFontMetrics();
-        int scoreX = VIEWPORT_WIDTH - fmScore.stringWidth(scoreText) - 20;
-        int scoreY = 40;
-        g.setColor(Color.YELLOW);
-        g.drawString(scoreText, scoreX, scoreY);
+        // Draw score and coins using UIManager
+        uiManager.drawScore(g);
+        // Draw stats window using UIManager
+        uiManager.drawStats(g);
 
-        // Draw coins below score
-        String coinsText = "Coins: " + player.getCoins();
-        g.setFont(new Font("Arial", Font.BOLD, 20));
-        g.setColor(Color.WHITE);
-        g.drawString(coinsText, scoreX, scoreY + 30);
-
-        // Draw stats window on left
-        int statsX = 20, statsY = 60;
-        g.setColor(new Color(30,30,30,200));
-        g.fillRoundRect(statsX-10, statsY-30, 180, 90, 18, 18);
-        g.setColor(Color.WHITE);
-        g.setFont(new Font("Arial", Font.BOLD, 18));
-        g.drawString("Player Stats", statsX, statsY);
-        g.setFont(new Font("Arial", Font.PLAIN, 16));
-        g.drawString("Health: " + player.getHealth(), statsX, statsY + 25);
-        g.drawString("Damage: 10", statsX, statsY + 45); // Placeholder for damage
         // Draw background or map grid
         g.setColor(Color.DARK_GRAY);
         for (int x = 0; x < MAP_WIDTH; x += 50) {
@@ -376,11 +373,19 @@ public class Game extends JPanel implements Runnable {
         if (playerDistance <= visibilityRadius) {
             player.draw(g, camera);
         }
-        for (BaseEnemy enemy : enemies) {
+        for (BaseEnemy enemy : enemyManager.getEnemies()) {
             double enemyDistance = enemy.getPosition().distance(camera.getX() + VIEWPORT_WIDTH / 2,
                     camera.getY() + VIEWPORT_HEIGHT / 2);
             if (enemyDistance <= visibilityRadius) {
                 enemy.draw(g, camera);
+                // --- DEBUG: Draw enemy HP and damage above each enemy ---
+                g.setFont(new Font("Arial", Font.BOLD, 14));
+                g.setColor(Color.WHITE);
+                int ex = camera.getScreenX(enemy.getPosition().x);
+                int ey = camera.getScreenY(enemy.getPosition().y);
+                String stats = "HP: " + (int) enemy.getHealth() + "  DMG: " + enemy.getDamage();
+                g.drawString(stats, ex - 10, ey - 10);
+                // --- END DEBUG ---
                 // Debug: draw enemy roam/scout target if enabled
                 if (DEBUG) {
                     try {
@@ -391,12 +396,14 @@ public class Game extends JPanel implements Runnable {
                             g.setColor(Color.CYAN);
                             int tx = camera.getScreenX(roamTarget.x);
                             int ty = camera.getScreenY(roamTarget.y);
-                            g.drawOval(tx-5, ty-5, 10, 10);
-                            g.drawLine(camera.getScreenX(enemy.getPosition().x), camera.getScreenY(enemy.getPosition().y), tx, ty);
+                            g.drawOval(tx - 5, ty - 5, 10, 10);
+                            g.drawLine(camera.getScreenX(enemy.getPosition().x),
+                                    camera.getScreenY(enemy.getPosition().y), tx, ty);
                             g.setFont(new Font("Arial", Font.PLAIN, 12));
-                            g.drawString("Target: ("+roamTarget.x+","+roamTarget.y+")", tx+8, ty);
+                            g.drawString("Target: (" + roamTarget.x + "," + roamTarget.y + ")", tx + 8, ty);
                         }
-                    } catch (Exception ex) { /* ignore if not present */ }
+                    } catch (Exception e2) {
+                        /* ignore if not present */ }
                 }
             }
         }
@@ -406,11 +413,11 @@ public class Game extends JPanel implements Runnable {
             int px = camera.getScreenX(player.getPosition().x);
             int py = camera.getScreenY(player.getPosition().y);
             g.setFont(new Font("Arial", Font.PLAIN, 12));
-            g.drawString("Player: ("+player.getPosition().x+","+player.getPosition().y+")", px+20, py-10);
+            g.drawString("Player: (" + player.getPosition().x + "," + player.getPosition().y + ")", px + 20, py - 10);
 
             // Draw lines from player to all chests
             g.setColor(Color.PINK);
-            for (Chest chest : chests) {
+            for (Chest chest : chestManager.getChests()) {
                 if (!chest.opened) {
                     int cx = camera.getScreenX(chest.x);
                     int cy = camera.getScreenY(chest.y);
@@ -419,13 +426,13 @@ public class Game extends JPanel implements Runnable {
             }
         }
 
-        for (Bullet bullet : bullets)
+        for (Bullet bullet : bulletManager.getBullets())
             bullet.draw(g, camera);
         for (Coin coin : coins)
             coin.draw(g, camera);
-        for (Chest chest : chests)
+        for (Chest chest : chestManager.getChests())
             chest.draw(g, camera);
-        for (Chest chest : chests)
+        for (Chest chest : chestManager.getChests())
             chest.draw(g, camera);
 
         // Draw Game Over text if game is over
@@ -457,13 +464,14 @@ public class Game extends JPanel implements Runnable {
         }
 
     }
+
     // Resets all game state for a fresh restart
     private void restartGame() {
         player = new Player(500, 500);
-        enemies = new ArrayList<>();
-        bullets = new ArrayList<>();
-        enemies.add(new SquareEnemy(1000, 1000));
-        enemies.add(new HealerEnemy(1100, 1100));
+        enemyManager.reset();
+        bulletManager = new BulletManager();
+        enemyManager.getEnemies().add(new SquareEnemy(1000, 1000));
+        enemyManager.getEnemies().add(new HealerEnemy(1100, 1100));
         camera = new Camera(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, MAP_WIDTH, MAP_HEIGHT);
         coverManager = new DiamondCoverManager();
         score = 0;
@@ -474,6 +482,23 @@ public class Game extends JPanel implements Runnable {
         healerTimer = 0;
         gameOver = false;
         repaint();
+    }
+
+    public Player getPlayer() {
+        return player;
+    }
+
+    public int getViewportWidth() {
+        return VIEWPORT_WIDTH;
+    }
+
+    public int getScore() {
+        return score;
+    }
+
+    // Add score to the current score
+    public void addScore(int value) {
+        this.score += value;
     }
 }
 

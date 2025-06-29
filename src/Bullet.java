@@ -1,4 +1,3 @@
-// === Bullet.java ===
 import java.awt.*;
 
 public class Bullet {
@@ -18,6 +17,10 @@ public class Bullet {
         this.dx = dx;
         this.dy = dy;
         this.type = type; // 👈 set bullet type
+    }
+
+    public void setDamage(int damage) {
+        this.damage = damage;
     }
 
     public Rectangle getBounds() {
