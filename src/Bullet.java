@@ -11,6 +11,9 @@ public class Bullet {
 
     BulletType type; // 
 
+    private double critChance = 0.0;
+    private double critMultiplier = 1.0;
+
     public Bullet(double x, double y, double dx, double dy, BulletType type) {
         this.x = x;
         this.y = y;
@@ -22,6 +25,11 @@ public class Bullet {
     public void setDamage(int damage) {
         this.damage = damage;
     }
+
+    public void setCritChance(double critChance) { this.critChance = critChance; }
+    public void setCritMultiplier(double critMultiplier) { this.critMultiplier = critMultiplier; }
+    public double getCritChance() { return critChance; }
+    public double getCritMultiplier() { return critMultiplier; }
 
     public Rectangle getBounds() {
         return new Rectangle((int)x, (int)y, 5, 5);

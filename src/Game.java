@@ -1,4 +1,3 @@
-
 // === Game.java ===
 import javax.swing.*;
 import java.awt.*;
@@ -11,6 +10,7 @@ import java.util.Iterator;
 
 import java.util.List;
 import java.util.Random;
+import javax.sound.sampled.Clip;
 
 public class Game extends JPanel implements Runnable {
     private WallManager wallManager;
@@ -22,10 +22,10 @@ public class Game extends JPanel implements Runnable {
     private long chestUITextTime = 0;
     private long lastChestSpawnTime = 0;
     private static final long CHEST_SPAWN_INTERVAL = 15000; // 15 seconds
-    private static final double RARE_RATE = 0.15;
-    private static final double SUPER_RARE_RATE = 0.05;
+    private static final double RARE_RATE = 0.20;
+    private static final double SUPER_RARE_RATE = 0.10;
     // Debug flag
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
     // --- Enemy spawn timing (seconds) ---
     public static final int SQUARE_START = 0;
     public static final int DIAMOND_START = 30;
@@ -34,10 +34,10 @@ public class Game extends JPanel implements Runnable {
     public static final int DIAMOND_LOW_RATE_START = 40;
 
     // --- Spawn rates (frames) ---
-    public static final int SQUARE_SPAWN_RATE = 120; // every 2s
-    public static final int DIAMOND_SPAWN_RATE = 800; // every 5s (after 40s)
-    public static final int CIRCLE_SPAWN_RATE = 420; // every 4s
-    public static final int HEALER_SPAWN_RATE = 600; // every 10s
+    public static final int SQUARE_SPAWN_RATE = 150; // every 5s
+    public static final int DIAMOND_SPAWN_RATE = 1200; // every 20s
+    public static final int CIRCLE_SPAWN_RATE = 900; // every 15s
+    public static final int HEALER_SPAWN_RATE = 900; // every 15s
     private int score = 0;
     private Thread gameThread;
     private boolean running = false;
@@ -55,6 +55,8 @@ public class Game extends JPanel implements Runnable {
 
     private boolean gameOver = false;
     private Rectangle restartButtonBounds = new Rectangle();
+    private boolean showStartScreen = true;
+    private Rectangle startButtonBounds = new Rectangle();
 
     private int frameCount = 0;
     private int squareTimer = 0, diamondTimer = 0, circleTimer = 0, healerTimer = 0;
@@ -64,7 +66,7 @@ public class Game extends JPanel implements Runnable {
     // Enemy scaling configuration
     public double ENEMY_HP_SCALE = 1.0;
     public double ENEMY_DMG_SCALE = 1.0;
-    public int ENEMY_SCALE_INTERVAL = 15; // seconds
+    public int ENEMY_SCALE_INTERVAL = 20; // seconds
     public double ENEMY_HP_PER_INTERVAL = 0.05; // +15% HP per interval
     public double ENEMY_DMG_PER_INTERVAL = 0.05; // +10% damage per interval
     // Per-type base values (can be changed)
@@ -78,6 +80,8 @@ public class Game extends JPanel implements Runnable {
     public double HEALER_BASE_DMG = 0;
 
     private UIManager uiManager;
+    private PowerupManager powerupManager = new PowerupManager();
+    private Clip bgMusic;
 
     public Game() {
         wallManager = new WallManager();
@@ -103,27 +107,39 @@ public class Game extends JPanel implements Runnable {
         coins = new ArrayList<>();
         chestManager = new ChestManager();
         lastChestSpawnTime = System.currentTimeMillis();
-        SquareEnemy sq = new SquareEnemy(1000, 1000);
-        sq.setDamage((int) SQUARE_BASE_DMG);
-        enemyManager.getEnemies().add(sq);
-        // enemyManager.getEnemies().add(new SquareEnemy(1200, 1000));
-        // enemyManager.getEnemies().add(new SquareEnemy(1300, 1000));
-        DiamondEnemy de = new DiamondEnemy(1050, 1000);
-        de.setDamage((int) DIAMOND_BASE_DMG);
-        enemyManager.getEnemies().add(de);
-        CircleEnemy ce = new CircleEnemy(1250, 1000);
-        ce.setDamage((int) CIRCLE_BASE_DMG);
-        enemyManager.getEnemies().add(ce);
-        // enemyManager.getEnemies().add(new CircleEnemy(1150, 1000));
-        enemyManager.getEnemies().add(new HealerEnemy(1100, 1100));
+        // SquareEnemy sq = new SquareEnemy(1000, 1000);
+        // sq.setDamage((int) SQUARE_BASE_DMG);
+        // enemyManager.getEnemies().add(sq);
+        // // enemyManager.getEnemies().add(new SquareEnemy(1200, 1000));
+        // // enemyManager.getEnemies().add(new SquareEnemy(1300, 1000));
+        // DiamondEnemy de = new DiamondEnemy(1050, 1000);
+        // de.setDamage((int) DIAMOND_BASE_DMG);
+        // enemyManager.getEnemies().add(de);
+        // CircleEnemy ce = new CircleEnemy(1250, 1000);
+        // ce.setDamage((int) CIRCLE_BASE_DMG);
+        // enemyManager.getEnemies().add(ce);
+        // // enemyManager.getEnemies().add(new CircleEnemy(1150, 1000));
+        // enemyManager.getEnemies().add(new HealerEnemy(1100, 1100));
         camera = new Camera(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, MAP_WIDTH, MAP_HEIGHT);
         coverManager = new DiamondCoverManager();
         uiManager = new UIManager(this);
 
-        // Mouse listener for restart button
+        // Start background music
+        String musicFile = Math.random() < 0.5 ?
+        "assets/music/Music1.wav" :
+        "assets/music/Music2.wav";
+        bgMusic = SoundManager.playLoop(musicFile);
+
+
+        // Mouse listener for start and restart button
         addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mousePressed(java.awt.event.MouseEvent e) {
+                if (showStartScreen && startButtonBounds.contains(e.getPoint())) {
+                    showStartScreen = false;
+                    // (Re)start background music if needed
+                    if (bgMusic != null && !bgMusic.isRunning()) bgMusic.start();
+                }
                 if (gameOver && restartButtonBounds.contains(e.getPoint())) {
                     restartGame();
                 }
@@ -167,7 +183,7 @@ public class Game extends JPanel implements Runnable {
         final long frameDuration = 1000 / targetFPS;
         while (running) {
             long frameStart = System.currentTimeMillis();
-            update();
+            if (!showStartScreen) update();
             repaint();
             long frameEnd = System.currentTimeMillis();
             long elapsed = frameEnd - frameStart;
@@ -264,9 +280,106 @@ public class Game extends JPanel implements Runnable {
                     int cost = Chest.getCoinCost(chest.rarity);
                     if (player.getCoins() >= cost) {
                         player.setCoins(player.getCoins() - cost);
+                        SoundManager.playSound("assets/sounds/Find_Item.wav"); // Play before opening
                         chest.opened = true;
-                        chestPowerupName = Chest.getAbilityName(chest.rarity);
-                        chestPowerupDesc = Chest.getAbilityDescription(chest.rarity);
+                        // --- Powerup logic ---
+                        PowerupManager.PowerupType powerup = powerupManager.getRandomPowerup(chest.rarity);
+                        switch (powerup) {
+                            case MAX_HP_5:
+                                player.increaseMaxHealth(5);
+                                chestPowerupName = "+5 Max HP";
+                                chestPowerupDesc = "Increase your max HP by 5.";
+                                break;
+                            case MAX_HP_7:
+                                player.increaseMaxHealth(7);
+                                chestPowerupName = "+7 Max HP";
+                                chestPowerupDesc = "Increase your max HP by 7.";
+                                break;
+                            case MAX_HP_10:
+                                player.increaseMaxHealth(10);
+                                chestPowerupName = "+10 Max HP";
+                                chestPowerupDesc = "Increase your max HP by 10.";
+                                break;
+                            case DAMAGE_10:
+                                player.increasePlayerDamagePercent(10);
+                                chestPowerupName = "+10% Damage";
+                                chestPowerupDesc = "Increase your damage by 10%.";
+                                break;
+                            case DAMAGE_20:
+                                player.increasePlayerDamagePercent(15);
+                                chestPowerupName = "+15% Damage";
+                                chestPowerupDesc = "Increase your damage by 15%.";
+                                break;
+                            case DAMAGE_30:
+                                player.increasePlayerDamagePercent(20);
+                                chestPowerupName = "+20% Damage";
+                                chestPowerupDesc = "Increase your damage by 20%.";
+                                break;
+                            case REGEN_025:
+                                player.addHealthRegen(0.25);
+                                chestPowerupName = "+0.25 HP/sec Regen";
+                                chestPowerupDesc = "Regenerate 0.25 HP per second.";
+                                break;
+                            case REGEN_05:
+                                player.addHealthRegen(0.5);
+                                chestPowerupName = "+0.5 HP/sec Regen";
+                                chestPowerupDesc = "Regenerate 0.5 HP per second.";
+                                break;
+                            case REGEN_1:
+                                player.addHealthRegen(1.0);
+                                chestPowerupName = "+1 HP/sec Regen";
+                                chestPowerupDesc = "Regenerate 1 HP per second.";
+                                break;
+                            case ATTACK_SPEED_5:
+                                player.increaseAttackSpeedPercent(5);
+                                chestPowerupName = "+5% Attack Speed";
+                                chestPowerupDesc = "Shoot 5% faster.";
+                                break;
+                            case ATTACK_SPEED_10:
+                                player.increaseAttackSpeedPercent(10);
+                                chestPowerupName = "+10% Attack Speed";
+                                chestPowerupDesc = "Shoot 10% faster.";
+                                break;
+                            case ATTACK_SPEED_20:
+                                player.increaseAttackSpeedPercent(20);
+                                chestPowerupName = "+20% Attack Speed";
+                                chestPowerupDesc = "Shoot 20% faster.";
+                                break;
+                            case MULTISHOT_2:
+                                player.grantMultishot2();
+                                chestPowerupName = "Multishot 2";
+                                chestPowerupDesc = "Shoot an extra bullet from your back.";
+                                break;
+                            case MULTISHOT_3:
+                                player.grantMultishot3();
+                                chestPowerupName = "Multishot 3";
+                                chestPowerupDesc = "Shoot 3 bullets in a spread from your front.";
+                                break;
+                            case CRIT_CHANCE_15:
+                                player.addCritChance(15);
+                                chestPowerupName = "+15% Crit Chance";
+                                chestPowerupDesc = "15% chance for critical hits.";
+                                break;
+                            case CRIT_CHANCE_30:
+                                player.addCritChance(30);
+                                chestPowerupName = "+30% Crit Chance";
+                                chestPowerupDesc = "30% chance for critical hits.";
+                                break;
+                            case CRIT_MULT_1_5:
+                                player.addCritMultiplier(0.5);
+                                chestPowerupName = "Crit Multiplier +0.5x";
+                                chestPowerupDesc = "Critical hits deal +0.5x more damage (stacks).";
+                                break;
+                            case CRIT_MULT_2_0:
+                                player.addCritMultiplier(1.0);
+                                chestPowerupName = "Crit Multiplier +1.0x";
+                                chestPowerupDesc = "Critical hits deal +1.0x more damage (stacks).";
+                                break;
+                            default:
+                                // For now, only implement health and damage powerups
+                                chestPowerupName = "???";
+                                chestPowerupDesc = "(Other powerups coming soon)";
+                        }
                         chestUIActive = true;
                         chestUITextTime = System.currentTimeMillis();
                         chestIt.remove(); // Remove chest from world
@@ -305,14 +418,19 @@ public class Game extends JPanel implements Runnable {
             if (!coin.isCollected() && coin.getBounds().intersects(player.getBounds())) {
                 coin.collect();
                 player.addCoins(coin.value);
+                // Play coin pickup sound
+                SoundManager.playSound("assets/sounds/money.wav");
                 coinIterator.remove();
             }
         }
 
         // Handle shooting
         if (InputHandler.mousePressed && InputHandler.shootCooldown <= 0) {
-            bulletManager.addBullet(player.shootAtMouse(camera));
-            InputHandler.shootCooldown = 15;
+            java.util.List<Bullet> shots = player.shootAtMouseMulti(camera);
+            for (Bullet b : shots) bulletManager.addBullet(b);
+            // Play shooting sound
+            SoundManager.playSound("assets/sounds/Fire.wav");
+            InputHandler.shootCooldown = player.getCurrentShootCooldown();
         } else if (InputHandler.shootCooldown > 0) {
             InputHandler.shootCooldown--;
         }
@@ -321,11 +439,52 @@ public class Game extends JPanel implements Runnable {
         if (player.getHealth() <= 0) {
             player.setHealth(0); // Clamp health to 0
             gameOver = true;
+            SoundManager.playSound("assets/sounds/Hero_Dies.wav");
         }
     }
 
     public void paintComponent(Graphics g) {
         super.paintComponent(g);
+        if (showStartScreen) {
+            // Draw info at top
+            g.setColor(Color.WHITE);
+            g.setFont(new Font("Arial", Font.BOLD, 22));
+            g.drawString("ENEMIES:", 40, 50);
+            g.setFont(new Font("Arial", Font.PLAIN, 18));
+            g.drawString("Square: Average enemy.", 40, 80);
+            g.drawString("Circle: Fast, shoots 3 bullets.", 40, 110);
+            g.drawString("Diamond: Tanky, squares hide behind it.", 40, 140);
+            g.drawString("Healer: Heals enemies, doesn't attack.", 40, 170);
+            g.setFont(new Font("Arial", Font.BOLD, 22));
+            g.drawString("CHESTS:", 40, 210);
+            g.setFont(new Font("Arial", Font.PLAIN, 18));
+            g.drawString("C = Common, R = Rare, S = Super Rare.", 40, 240);
+            g.drawString("Open with coins dropped by enemies to get powerups.", 40, 270);
+            g.drawString("Go on top of chest and press E to open.", 40, 300);
+            g.setFont(new Font("Arial", Font.BOLD, 22));
+            g.drawString("CONTROLS:", 40, 340);
+            g.setFont(new Font("Arial", Font.PLAIN, 18));
+            g.drawString("Move: WASD", 40, 370);
+            g.drawString("Open Chest: E", 40, 400);
+            // Draw start button at bottom
+            String btnText = "Start Game";
+            g.setFont(new Font("Arial", Font.BOLD, 36));
+            FontMetrics btnFM = g.getFontMetrics();
+            int btnWidth = btnFM.stringWidth(btnText) + 40;
+            int btnHeight = btnFM.getHeight() + 20;
+            int btnX = (VIEWPORT_WIDTH - btnWidth) / 2;
+            int btnY = (VIEWPORT_HEIGHT) / 2 ; // Just below center
+            startButtonBounds.setBounds(btnX, btnY, btnWidth, btnHeight);
+            g.setColor(Color.LIGHT_GRAY);
+            g.fillRoundRect(btnX, btnY, btnWidth, btnHeight, 20, 20);
+            g.setColor(Color.BLACK);
+            g.drawRoundRect(btnX, btnY, btnWidth, btnHeight, 20, 20);
+            int textX = btnX + (btnWidth - btnFM.stringWidth(btnText)) / 2;
+            int textY = btnY + ((btnHeight - btnFM.getHeight()) / 2) + btnFM.getAscent();
+            g.drawString(btnText, textX, textY);
+            return;
+        }
+
         // Draw walls
         for (Wall wall : wallManager.getWalls())
             wall.draw(g, camera);
@@ -374,6 +533,7 @@ public class Game extends JPanel implements Runnable {
             player.draw(g, camera);
         }
         for (BaseEnemy enemy : enemyManager.getEnemies()) {
+            if (!enemy.isAlive()) continue; // Do not draw stats for dead enemies
             double enemyDistance = enemy.getPosition().distance(camera.getX() + VIEWPORT_WIDTH / 2,
                     camera.getY() + VIEWPORT_HEIGHT / 2);
             if (enemyDistance <= visibilityRadius) {
@@ -463,6 +623,10 @@ public class Game extends JPanel implements Runnable {
             g.drawString(btnText, textX, textY);
         }
 
+        // Draw hearts
+        for (Heart heart : hearts) {
+            if (!heart.collected) heart.draw(g, camera);
+        }
     }
 
     // Resets all game state for a fresh restart
@@ -470,6 +634,7 @@ public class Game extends JPanel implements Runnable {
         player = new Player(500, 500);
         enemyManager.reset();
         bulletManager = new BulletManager();
+        chestManager.clear(); // Clear all chests on restart
         enemyManager.getEnemies().add(new SquareEnemy(1000, 1000));
         enemyManager.getEnemies().add(new HealerEnemy(1100, 1100));
         camera = new Camera(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, MAP_WIDTH, MAP_HEIGHT);
@@ -481,8 +646,18 @@ public class Game extends JPanel implements Runnable {
         circleTimer = 0;
         healerTimer = 0;
         gameOver = false;
+        SoundManager.stop(bgMusic); // Stop background music
+
+        String musicFile = Math.random() < 0.5 ?
+        "assets/music/Music1.wav" :
+        "assets/music/Music2.wav";
+        bgMusic = SoundManager.playLoop(musicFile);
+        
         repaint();
     }
+
+    private ArrayList<Heart> hearts = new ArrayList<>();
+    private long lastHeartSpawnTime = System.currentTimeMillis();
 
     public Player getPlayer() {
         return player;

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch4jConfig>
+  <dontWrapJar>false</dontWrapJar>
+  <headerType>gui</headerType>
+  <jar>D:\Coding stuff\Java OOP Lab\Project OOP\RougeLike2025\Game.jar</jar>
+  <outfile>D:\Coding stuff\Java OOP Lab\Project OOP\RougeLike2025\Game.exe</outfile>
+  <errTitle></errTitle>
+  <cmdLine></cmdLine>
+  <chdir>.</chdir>
+  <priority>normal</priority>
+  <downloadUrl></downloadUrl>
+  <supportUrl></supportUrl>
+  <stayAlive>false</stayAlive>
+  <restartOnCrash>false</restartOnCrash>
+  <manifest></manifest>
+  <icon>D:\Coding stuff\Java OOP Lab\Project OOP\RougeLike2025\Screenshot 2025-06-29 171632.ico</icon>
+  <classPath>
+    <mainClass>App</mainClass>
+  </classPath>
+  <jre>
+    <path>D:\Coding stuff\Java OOP Lab\Project OOP\RougeLike2025\jre</path>
+    <requiresJdk>false</requiresJdk>
+    <requires64Bit>false</requires64Bit>
+    <minVersion></minVersion>
+    <maxVersion></maxVersion>
+  </jre>
+</launch4jConfig>

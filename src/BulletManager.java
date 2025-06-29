@@ -47,7 +47,16 @@ public class BulletManager {
                 if (enemy.isAlive() && bullet.isActive() &&
                         bullet.getType() == BulletType.PLAYER &&
                         bullet.getBounds().intersects(enemy.getBounds())) {
-                    enemy.takeDamage(bullet.getDamage());
+                    int dmg = bullet.getDamage();
+                    boolean crit = false;
+                    if (Math.random() * 100 < bullet.getCritChance()) {
+                        crit = true;
+                        dmg = (int)Math.round(dmg * bullet.getCritMultiplier());
+                    }
+                    enemy.takeDamage(dmg);
+                    if (crit) {
+                        System.out.println("CRIT! Player bullet dealt " + dmg + " damage (x" + bullet.getCritMultiplier() + ")");
+                    }
                     if (!enemy.isAlive()) {
                         game.addScore(10); // Add score for killing enemy
                         // Drop coin(s) on enemy death
@@ -60,8 +69,9 @@ public class BulletManager {
                 // Add logic for enemy bullets hitting the player
                 if (bullet.getType() == BulletType.ENEMY &&
                         bullet.getBounds().intersects(player.getBounds())) {
-                    System.out.println("Player takes damage from enemy bullet: " + bullet.getDamage());
-                    // player.takeDamage(bullet.getDamage());
+                    // Play hero hurt sound
+                    SoundManager.playSound("assets/sounds/hero hurt.wav");
+                    player.takeDamage(bullet.getDamage());
                     bullet.deactivate();
                     bulletIterator.remove();
                     break;

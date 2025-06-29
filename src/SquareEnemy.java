@@ -12,7 +12,7 @@ public class SquareEnemy extends BaseEnemy {
 
     public SquareEnemy(int x, int y) {
         super(x, y, 100, 2);
-        this.attackRange = 200; // Default for SquareEnemy
+        this.attackRange = 300; // Default for SquareEnemy
         setCoinValue(2);
     }
 

@@ -17,7 +17,10 @@ public class UIManager {
         g.drawString("Player Stats", statsX, statsY);
         g.setFont(new Font("Arial", Font.PLAIN, 16));
         g.drawString("Health: " + game.getPlayer().getHealth(), statsX, statsY + 25);
-        g.drawString("Damage: 10", statsX, statsY + 45); // Placeholder for damage
+        g.drawString("Damage: " + (int)Math.round(game.getPlayer().getPlayerDamage()), statsX, statsY + 45);
+        double shotsPerSec = 60.0 / game.getPlayer().getCurrentShootCooldown();
+        g.drawString(String.format("Atk Speed: %.2f/s", shotsPerSec), statsX, statsY + 65);
+        g.drawString(String.format("Crit: %.0f%% x%.2f", game.getPlayer().getCritChance(), game.getPlayer().getCritMultiplier()), statsX, statsY + 85);
     }
 
     public void drawScore(Graphics g) {
