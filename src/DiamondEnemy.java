@@ -4,12 +4,11 @@ import java.util.List;
 public class DiamondEnemy extends BaseEnemy {
     private Point roamTarget = null;
     private long roamEndTime = 0;
-    private boolean scouting = false;
 
     public DiamondEnemy(int x, int y) {
         super(x, y, 200, 1);
         this.attackRange = 180; // Default for DiamondEnemy
-        setCoinValue(5);
+        setCoinValue(7);
     }
 
     @Override
@@ -20,7 +19,6 @@ public class DiamondEnemy extends BaseEnemy {
         if (dist < 200) {
             state = AIState.CHASE;
             roamTarget = null;
-            scouting = false;
             if (dist >= 100) {
                 int wiggleX = (int)((Math.random() - 0.5) * 5);
                 int wiggleY = (int)((Math.random() - 0.5) * 5);
@@ -38,14 +36,12 @@ public class DiamondEnemy extends BaseEnemy {
             scoutY = Math.max(0, Math.min(scoutY, 1500-20));
             roamTarget = new Point(scoutX, scoutY);
             roamEndTime = now + 5000;
-            scouting = true;
         }
         // Roaming or scouting
         if (state == AIState.SCOUTING && roamTarget != null) {
             moveWithCollision(roamTarget.x, roamTarget.y, allEnemies);
             if (now > roamEndTime || getPosition().distance(roamTarget) < 10) {
                 roamTarget = null;
-                scouting = false;
                 state = AIState.ROAMING;
             }
             return;
@@ -70,7 +66,6 @@ public class DiamondEnemy extends BaseEnemy {
         if (dist < 200) {
             state = AIState.CHASE;
             roamTarget = null;
-            scouting = false;
             if (dist >= 100) {
                 int wiggleX = (int)((Math.random() - 0.5) * 5);
                 int wiggleY = (int)((Math.random() - 0.5) * 5);
@@ -88,14 +83,12 @@ public class DiamondEnemy extends BaseEnemy {
             scoutY = Math.max(0, Math.min(scoutY, 1500-20));
             roamTarget = new Point(scoutX, scoutY);
             roamEndTime = now + 5000;
-            scouting = true;
         }
         // Roaming or scouting
         if (state == AIState.SCOUTING && roamTarget != null) {
             moveWithCollision(roamTarget.x, roamTarget.y, allEnemies, walls);
             if (now > roamEndTime || getPosition().distance(roamTarget) < 10) {
                 roamTarget = null;
-                scouting = false;
                 state = AIState.ROAMING;
             }
             return;

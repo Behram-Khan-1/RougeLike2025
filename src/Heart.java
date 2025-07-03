@@ -3,6 +3,7 @@ import java.awt.*;
 public class Heart {
     public int x, y;
     public static final int SIZE = 16;
+    public static int HEAL_AMOUNT = 10; // Amount healed when picked up
     public boolean collected = false;
     public Heart(int x, int y) { this.x = x; this.y = y; }
     public Rectangle getBounds() { return new Rectangle(x, y, SIZE, SIZE); }

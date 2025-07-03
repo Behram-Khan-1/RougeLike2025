@@ -2,8 +2,7 @@ import java.awt.*;
 
 public class Wall {
     public int x, y, width, height;
-    private static final int MIN_SIZE = 60;
-    private static final int MAX_SIZE = 180;
+
 
     public Wall(int x, int y, int width, int height) {
         this.x = x;

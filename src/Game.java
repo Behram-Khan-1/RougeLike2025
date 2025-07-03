@@ -7,9 +7,6 @@ import java.util.Iterator;
 
 // Modular enemy imports
 // (No explicit imports needed for same-package classes)
-
-import java.util.List;
-import java.util.Random;
 import javax.sound.sampled.Clip;
 
 public class Game extends JPanel implements Runnable {
@@ -34,10 +31,10 @@ public class Game extends JPanel implements Runnable {
     public static final int DIAMOND_LOW_RATE_START = 40;
 
     // --- Spawn rates (frames) ---
-    public static final int SQUARE_SPAWN_RATE = 150; // every 5s
+    public static final int SQUARE_SPAWN_RATE = 300; // every 5s
     public static final int DIAMOND_SPAWN_RATE = 1200; // every 20s
-    public static final int CIRCLE_SPAWN_RATE = 900; // every 15s
-    public static final int HEALER_SPAWN_RATE = 900; // every 15s
+    public static final int CIRCLE_SPAWN_RATE = 1000; // every 15s
+    public static final int HEALER_SPAWN_RATE = 1050; // every 15s
     private int score = 0;
     private Thread gameThread;
     private boolean running = false;
@@ -58,24 +55,21 @@ public class Game extends JPanel implements Runnable {
     private boolean showStartScreen = true;
     private Rectangle startButtonBounds = new Rectangle();
 
-    private int frameCount = 0;
-    private int squareTimer = 0, diamondTimer = 0, circleTimer = 0, healerTimer = 0;
-
     private DiamondCoverManager coverManager;
 
     // Enemy scaling configuration
     public double ENEMY_HP_SCALE = 1.0;
     public double ENEMY_DMG_SCALE = 1.0;
-    public int ENEMY_SCALE_INTERVAL = 20; // seconds
-    public double ENEMY_HP_PER_INTERVAL = 0.05; // +15% HP per interval
-    public double ENEMY_DMG_PER_INTERVAL = 0.05; // +10% damage per interval
+    public int ENEMY_SCALE_INTERVAL = 30; // seconds
+    public double ENEMY_HP_PER_INTERVAL = 0.03; // +15% HP per interval
+    public double ENEMY_DMG_PER_INTERVAL = 0.03; // +10% damage per interval
     // Per-type base values (can be changed)
     public int SQUARE_BASE_HP = 100;
-    public double SQUARE_BASE_DMG = 10;
+    public double SQUARE_BASE_DMG = 5;
     public int DIAMOND_BASE_HP = 200;
-    public double DIAMOND_BASE_DMG = 6;
+    public double DIAMOND_BASE_DMG = 7;
     public int CIRCLE_BASE_HP = 60;
-    public double CIRCLE_BASE_DMG = 12;
+    public double CIRCLE_BASE_DMG = 10;
     public int HEALER_BASE_HP = 120;
     public double HEALER_BASE_DMG = 0;
 
@@ -403,6 +397,40 @@ public class Game extends JPanel implements Runnable {
             spawnChest();
             lastChestSpawnTime = now;
         }
+        // --- Heart spawning logic (every 10 seconds) ---
+        final long HEART_SPAWN_INTERVAL = 10000; // 10 seconds
+        if (now - lastHeartSpawnTime > HEART_SPAWN_INTERVAL) {
+            // Try up to 10 times to find a valid spawn location
+            int attempts = 0;
+            boolean spawned = false;
+            while (attempts < 10 && !spawned) {
+                int margin = 40;
+                int hx = margin + (int)(Math.random() * (MAP_WIDTH - 2 * margin));
+                int hy = margin + (int)(Math.random() * (MAP_HEIGHT - 2 * margin));
+                Rectangle heartRect = new Rectangle(hx, hy, 20, 20);
+                boolean collides = false;
+                // Don't spawn on player
+                if (player.getBounds().intersects(heartRect) || player.getPosition().distance(hx, hy) < 60) collides = true;
+                // Don't spawn on walls
+                for (Wall wall : wallManager.getWalls()) {
+                    if (wall.getBounds().intersects(heartRect)) { collides = true; break; }
+                }
+                // Don't spawn on chests
+                for (Chest chest : chestManager.getChests()) {
+                    if (chest.getBounds().intersects(heartRect)) { collides = true; break; }
+                }
+                // Don't spawn on other hearts
+                for (Heart h : hearts) {
+                    if (!h.collected && new Rectangle(h.x, h.y, 20, 20).intersects(heartRect)) { collides = true; break; }
+                }
+                if (!collides) {
+                    hearts.add(new Heart(hx, hy));
+                    spawned = true;
+                }
+                attempts++;
+            }
+            lastHeartSpawnTime = now;
+        }
         player.update(MAP_WIDTH, MAP_HEIGHT);
         camera.update(player.getPosition().x, player.getPosition().y);
         spawnEnemies();
@@ -421,6 +449,19 @@ public class Game extends JPanel implements Runnable {
                 // Play coin pickup sound
                 SoundManager.playSound("assets/sounds/money.wav");
                 coinIterator.remove();
+            }
+        }
+
+        // Handle heart pickup
+        Iterator<Heart> heartIterator = hearts.iterator();
+        while (heartIterator.hasNext()) {
+            Heart heart = heartIterator.next();
+            if (!heart.collected && heart.getBounds().intersects(player.getBounds())) {
+                heart.collected = true;
+                player.setHealth(Math.min(player.getHealth() + Heart.HEAL_AMOUNT, player.getMaxHealth()));
+                // Optional: play a sound effect for heart pickup
+                SoundManager.playSound("assets/sounds/Heal.wav");
+                heartIterator.remove();
             }
         }
 
@@ -466,6 +507,8 @@ public class Game extends JPanel implements Runnable {
             g.setFont(new Font("Arial", Font.PLAIN, 18));
             g.drawString("Move: WASD", 40, 370);
             g.drawString("Open Chest: E", 40, 400);
+            g.drawString("Shoot: Left Mouse Button", 40, 430);
+            g.drawString("Pink Hearts: Pick them up to heal.", 40, 460);
             // Draw start button at bottom
             String btnText = "Start Game";
             g.setFont(new Font("Arial", Font.BOLD, 36));
@@ -473,7 +516,7 @@ public class Game extends JPanel implements Runnable {
             int btnWidth = btnFM.stringWidth(btnText) + 40;
             int btnHeight = btnFM.getHeight() + 20;
             int btnX = (VIEWPORT_WIDTH - btnWidth) / 2;
-            int btnY = (VIEWPORT_HEIGHT) / 2 ; // Just below center
+            int btnY = (VIEWPORT_HEIGHT) / 2; // Just below center
             startButtonBounds.setBounds(btnX, btnY, btnWidth, btnHeight);
             g.setColor(Color.LIGHT_GRAY);
             g.fillRoundRect(btnX, btnY, btnWidth, btnHeight, 20, 20);
@@ -635,24 +678,24 @@ public class Game extends JPanel implements Runnable {
         enemyManager.reset();
         bulletManager = new BulletManager();
         chestManager.clear(); // Clear all chests on restart
+        hearts.clear(); // Clear all hearts on restart
+        lastHeartSpawnTime = System.currentTimeMillis();
+        // Reset enemy base stats
+        SQUARE_BASE_HP = 100;
+        SQUARE_BASE_DMG = 10;
+        DIAMOND_BASE_HP = 200;
+        DIAMOND_BASE_DMG = 6;
+        CIRCLE_BASE_HP = 60;
+        CIRCLE_BASE_DMG = 12;
+        HEALER_BASE_HP = 120;
+        HEALER_BASE_DMG = 0;
         enemyManager.getEnemies().add(new SquareEnemy(1000, 1000));
         enemyManager.getEnemies().add(new HealerEnemy(1100, 1100));
         camera = new Camera(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, MAP_WIDTH, MAP_HEIGHT);
         coverManager = new DiamondCoverManager();
         score = 0;
-        frameCount = 0;
-        squareTimer = 0;
-        diamondTimer = 0;
-        circleTimer = 0;
-        healerTimer = 0;
+       
         gameOver = false;
-        SoundManager.stop(bgMusic); // Stop background music
-
-        String musicFile = Math.random() < 0.5 ?
-        "assets/music/Music1.wav" :
-        "assets/music/Music2.wav";
-        bgMusic = SoundManager.playLoop(musicFile);
-        
         repaint();
     }
 

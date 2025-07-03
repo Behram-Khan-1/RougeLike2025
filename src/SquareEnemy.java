@@ -5,10 +5,8 @@ import java.util.List;
 
 public class SquareEnemy extends BaseEnemy {
     private BaseEnemy currentCoverDiamond = null;
-    private Double fixedCoverAngle = null;
     private Point roamTarget = null;
     private long roamEndTime = 0;
-    private boolean scouting = false;
 
     public SquareEnemy(int x, int y) {
         super(x, y, 100, 2);
@@ -19,7 +17,6 @@ public class SquareEnemy extends BaseEnemy {
     // Main update method for game loop: always use this
     public void update(Player player, List<BaseEnemy> allEnemies, DiamondCoverManager coverManager, java.util.List<Wall> walls) {
         // (All logic here, using coverManager and walls, but check for null)
-        double dist = player.getPosition().distance(x, y);
         boolean lowHP = health < 0.3 * maxHealth;
         BaseEnemy nearestHealer = null;
         double minHealerDist = Double.MAX_VALUE;
@@ -52,7 +49,6 @@ public class SquareEnemy extends BaseEnemy {
             if (currentCoverDiamond != null && coverManager != null) {
                 coverManager.removeCover(currentCoverDiamond);
                 currentCoverDiamond = null;
-                fixedCoverAngle = null;
             }
             return;
         }
@@ -68,7 +64,6 @@ public class SquareEnemy extends BaseEnemy {
                 }
             }
         }
-        long now = System.currentTimeMillis();
         // If hiding behind diamond, check if player is in range
         if (bestDiamond != null) {
             // Assign cover if not already assigned
@@ -92,7 +87,6 @@ public class SquareEnemy extends BaseEnemy {
                     moveWithCollision(bestDiamond.getPosition().x + offsetX, bestDiamond.getPosition().y + offsetY, allEnemies, walls);
                 else
                     moveWithCollision(bestDiamond.getPosition().x + offsetX, bestDiamond.getPosition().y + offsetY, allEnemies);
-                fixedCoverAngle = coverAngle;
             } else {
                 state = AIState.ROAMING;
                 // If diamond is roaming/scouting, follow its target
@@ -122,21 +116,18 @@ public class SquareEnemy extends BaseEnemy {
                         moveWithCollision(bestDiamond.getPosition().x + offsetX, bestDiamond.getPosition().y + offsetY, allEnemies, walls);
                     else
                         moveWithCollision(bestDiamond.getPosition().x + offsetX, bestDiamond.getPosition().y + offsetY, allEnemies);
-                    fixedCoverAngle = coverAngle;
                 }
             }
             return;
         } else if (currentCoverDiamond != null && coverManager != null) {
             coverManager.removeCover(currentCoverDiamond);
             currentCoverDiamond = null;
-            fixedCoverAngle = null;
         }
         // Roaming/scouting logic
         double playerDist = player.getPosition().distance(x, y);
         if (playerDist < attackRange) {
             state = AIState.CHASE;
             roamTarget = null;
-            scouting = false;
             // Only move toward player if outside attack range (keep distance)
             if (playerDist > attackRange - 10) { // 10px buffer
                 int wiggleX = (int)((Math.random() - 0.5) * 5);
@@ -168,7 +159,6 @@ public class SquareEnemy extends BaseEnemy {
             scoutY = Math.max(0, Math.min(scoutY, 1500-20));
             roamTarget = new Point(scoutX, scoutY);
             roamEndTime = System.currentTimeMillis() + 5000;
-            scouting = true;
         }
         if (state == AIState.SCOUTING && roamTarget != null) {
             if (walls != null)
@@ -177,7 +167,6 @@ public class SquareEnemy extends BaseEnemy {
                 moveWithCollision(roamTarget.x, roamTarget.y, allEnemies);
             if (System.currentTimeMillis() > roamEndTime || getPosition().distance(roamTarget) < 10) {
                 roamTarget = null;
-                scouting = false;
                 state = AIState.ROAMING;
             }
             return;
