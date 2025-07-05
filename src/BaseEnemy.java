@@ -3,14 +3,14 @@ import java.awt.*;
 import java.util.List;
 
 public abstract class BaseEnemy {
-    protected int x, y, speed;
-    protected float health, maxHealth;
-    protected AIState state = AIState.IDLE;
-    protected long lastShotTime = 0;
-    protected static final long SHOOT_COOLDOWN = 1000;
-    protected int attackRange = 200; // Default, can be overridden per enemy
-    protected int coinValue = 1; // Default, can be overridden per enemy
-    protected int damage = 10; // Default damage, can be overridden
+protected int x, y, speed;
+protected float health, maxHealth;
+protected AIState state = AIState.IDLE;
+protected long lastShotTime = 0;
+protected static final long SHOOT_COOLDOWN = 1000;
+protected int attackRange = 200; // Default, can be overridden per enemy
+protected int coinValue = 1; // Default, can be overridden per enemy
+protected double damage = 10.0; // Default damage, can be overridden
 
     public int getAttackRange() {
         return attackRange;
@@ -29,11 +29,14 @@ public abstract class BaseEnemy {
     }
 
     public int getDamage() {
-        return damage;
+    return (int)Math.round(damage);
     }
 
     public void setDamage(int dmg) {
-        this.damage = dmg;
+    this.damage = dmg;
+}
+public void setDamage(double dmg) {
+    this.damage = dmg;
     }
 
     public void setMaxHealth(float hp) {

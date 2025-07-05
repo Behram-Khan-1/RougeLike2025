@@ -11,6 +11,9 @@ import javax.sound.sampled.Clip;
 
 public class Game extends JPanel implements Runnable {
     private WallManager wallManager;
+    public WallManager getWallManager() {
+        return wallManager;
+    }
     private ChestManager chestManager;
     // Chest opening UI state
     private boolean chestUIActive = false;
@@ -18,7 +21,7 @@ public class Game extends JPanel implements Runnable {
     private String chestPowerupDesc = "";
     private long chestUITextTime = 0;
     private long lastChestSpawnTime = 0;
-    private static final long CHEST_SPAWN_INTERVAL = 15000; // 15 seconds
+    private static final long CHEST_SPAWN_INTERVAL = 7000; // 10 seconds
     private static final double RARE_RATE = 0.20;
     private static final double SUPER_RARE_RATE = 0.10;
     // Debug flag
@@ -31,10 +34,10 @@ public class Game extends JPanel implements Runnable {
     public static final int DIAMOND_LOW_RATE_START = 40;
 
     // --- Spawn rates (frames) ---
-    public static final int SQUARE_SPAWN_RATE = 300; // every 5s
-    public static final int DIAMOND_SPAWN_RATE = 1200; // every 20s
-    public static final int CIRCLE_SPAWN_RATE = 1000; // every 15s
-    public static final int HEALER_SPAWN_RATE = 1050; // every 15s
+    public static final int SQUARE_SPAWN_RATE = 300; // every 3s
+    public static final int DIAMOND_SPAWN_RATE = 1300; // every 13s
+    public static final int CIRCLE_SPAWN_RATE = 1300; // every 13s
+    public static final int HEALER_SPAWN_RATE = 1050; // every 10.5s
     private int score = 0;
     private Thread gameThread;
     private boolean running = false;
@@ -60,18 +63,18 @@ public class Game extends JPanel implements Runnable {
     // Enemy scaling configuration
     public double ENEMY_HP_SCALE = 1.0;
     public double ENEMY_DMG_SCALE = 1.0;
-    public int ENEMY_SCALE_INTERVAL = 30; // seconds
-    public double ENEMY_HP_PER_INTERVAL = 0.03; // +15% HP per interval
-    public double ENEMY_DMG_PER_INTERVAL = 0.03; // +10% damage per interval
+    public int ENEMY_SCALE_INTERVAL = 35; // seconds
+    public double ENEMY_HP_PER_INTERVAL = 0.05; // +15% HP per interval
+    public double ENEMY_DMG_PER_INTERVAL = 0.05; // +10% damage per interval
     // Per-type base values (can be changed)
     public int SQUARE_BASE_HP = 100;
-    public double SQUARE_BASE_DMG = 5;
+    public double SQUARE_BASE_DMG = 5.0;
     public int DIAMOND_BASE_HP = 200;
-    public double DIAMOND_BASE_DMG = 7;
+    public double DIAMOND_BASE_DMG = 7.0;
     public int CIRCLE_BASE_HP = 60;
-    public double CIRCLE_BASE_DMG = 10;
+    public double CIRCLE_BASE_DMG = 7.0;
     public int HEALER_BASE_HP = 120;
-    public double HEALER_BASE_DMG = 0;
+    public double HEALER_BASE_DMG = 0.0;
 
     private UIManager uiManager;
     private PowerupManager powerupManager = new PowerupManager();
@@ -101,19 +104,7 @@ public class Game extends JPanel implements Runnable {
         coins = new ArrayList<>();
         chestManager = new ChestManager();
         lastChestSpawnTime = System.currentTimeMillis();
-        // SquareEnemy sq = new SquareEnemy(1000, 1000);
-        // sq.setDamage((int) SQUARE_BASE_DMG);
-        // enemyManager.getEnemies().add(sq);
-        // // enemyManager.getEnemies().add(new SquareEnemy(1200, 1000));
-        // // enemyManager.getEnemies().add(new SquareEnemy(1300, 1000));
-        // DiamondEnemy de = new DiamondEnemy(1050, 1000);
-        // de.setDamage((int) DIAMOND_BASE_DMG);
-        // enemyManager.getEnemies().add(de);
-        // CircleEnemy ce = new CircleEnemy(1250, 1000);
-        // ce.setDamage((int) CIRCLE_BASE_DMG);
-        // enemyManager.getEnemies().add(ce);
-        // // enemyManager.getEnemies().add(new CircleEnemy(1150, 1000));
-        // enemyManager.getEnemies().add(new HealerEnemy(1100, 1100));
+    
         camera = new Camera(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, MAP_WIDTH, MAP_HEIGHT);
         coverManager = new DiamondCoverManager();
         uiManager = new UIManager(this);
@@ -149,14 +140,25 @@ public class Game extends JPanel implements Runnable {
             rarity = Chest.Rarity.SUPER_RARE;
         else if (r < RARE_RATE + SUPER_RARE_RATE)
             rarity = Chest.Rarity.RARE;
-        // Pick random position not too close to player, and within viewport
-        int margin = 60;
-        int cx, cy;
-        do {
-            cx = (int) (camera.getX() + margin + Math.random() * (VIEWPORT_WIDTH - 2 * margin - 28));
-            cy = (int) (camera.getY() + margin + Math.random() * (VIEWPORT_HEIGHT - 2 * margin - 28));
-        } while (player.getPosition().distance(cx, cy) < 100);
-        chestManager.addChest(new Chest(cx, cy, rarity));
+        // Pick random position not too close to player, not on walls, and within viewport
+        int margin = 300; // Allow chests to spawn anywhere the player can walk
+        int cx = 0, cy = 0;
+        int attempts = 0;
+        boolean valid = false;
+        while (attempts < 20 && !valid) {
+            cx = margin + (int) (Math.random() * (MAP_WIDTH - margin * 2 - 28));
+            cy = margin + (int) (Math.random() * (MAP_HEIGHT - margin * 2 - 28));
+            Rectangle chestRect = new Rectangle(cx, cy, 28, 28); // Assuming chest is 28x28
+            valid = true;
+            if (player.getPosition().distance(cx, cy) < 100) valid = false;
+            for (Wall wall : wallManager.getWalls()) {
+                if (wall.getBounds().intersects(chestRect)) { valid = false; break; }
+            }
+            attempts++;
+        }
+        if (valid && attempts <= 20) {
+            chestManager.addChest(new Chest(cx, cy, rarity));
+        }
     }
 
     public void start() {
@@ -178,6 +180,7 @@ public class Game extends JPanel implements Runnable {
         while (running) {
             long frameStart = System.currentTimeMillis();
             if (!showStartScreen) update();
+            // Ensure enemies do not spawn on walls (handled in EnemyManager or here if needed)
             repaint();
             long frameEnd = System.currentTimeMillis();
             long elapsed = frameEnd - frameStart;
@@ -211,6 +214,14 @@ public class Game extends JPanel implements Runnable {
     }
 
     private void spawnEnemies() {
+        // Ensure new enemies do not spawn on top of walls
+        // This assumes enemyManager.update() is responsible for spawning new enemies
+        // If you have custom spawn logic, add wall collision checks there
+        // Example for random spawn (pseudo):
+        // for (each enemy to spawn) {
+        //   pick random x, y;
+        //   if (not colliding with any wall) spawn;
+        // }
         enemyManager.update();
     }
 
@@ -234,7 +245,11 @@ public class Game extends JPanel implements Runnable {
                 }
             }
         }
-        // Prevent enemies from moving through walls
+        // Clamp player to map boundaries (keep always visible)
+        int margin = 300; // margin so player is always inside screen
+        player.x = Math.max(margin, Math.min(player.x, MAP_WIDTH - margin ));
+        player.y = Math.max(margin, Math.min(player.y, MAP_HEIGHT - margin ));
+        // Prevent enemies from moving through walls and clamp to map boundaries
         for (BaseEnemy enemy : enemyManager.getEnemies()) {
             Rectangle er = enemy.getBounds();
             for (Wall wall : wallManager.getWalls()) {
@@ -254,6 +269,10 @@ public class Game extends JPanel implements Runnable {
                     }
                 }
             }
+            // Clamp enemy to map boundaries (keep always visible)
+            int marginE = 300;
+            enemy.getPosition().x = Math.max(marginE, Math.min(enemy.getPosition().x, MAP_WIDTH - marginE - 20));
+            enemy.getPosition().y = Math.max(marginE, Math.min(enemy.getPosition().y, MAP_HEIGHT - marginE - 20));
         }
         // Chest despawn and flicker logic
         long now = System.currentTimeMillis();
@@ -397,16 +416,16 @@ public class Game extends JPanel implements Runnable {
             spawnChest();
             lastChestSpawnTime = now;
         }
-        // --- Heart spawning logic (every 10 seconds) ---
-        final long HEART_SPAWN_INTERVAL = 10000; // 10 seconds
+        // --- Heart spawning logic (every 25 seconds) ---
+        final long HEART_SPAWN_INTERVAL = 25000; // 25 seconds
         if (now - lastHeartSpawnTime > HEART_SPAWN_INTERVAL) {
             // Try up to 10 times to find a valid spawn location
             int attempts = 0;
             boolean spawned = false;
             while (attempts < 10 && !spawned) {
-                int margin = 40;
-                int hx = margin + (int)(Math.random() * (MAP_WIDTH - 2 * margin));
-                int hy = margin + (int)(Math.random() * (MAP_HEIGHT - 2 * margin));
+                int marginHeart = 300; // margin to avoid spawning too close to walls or player
+                int hx = marginHeart + (int)(Math.random() * (MAP_WIDTH - 2 * marginHeart));
+                int hy = marginHeart + (int)(Math.random() * (MAP_HEIGHT - 2 * marginHeart));
                 Rectangle heartRect = new Rectangle(hx, hy, 20, 20);
                 boolean collides = false;
                 // Don't spawn on player
@@ -682,13 +701,13 @@ public class Game extends JPanel implements Runnable {
         lastHeartSpawnTime = System.currentTimeMillis();
         // Reset enemy base stats
         SQUARE_BASE_HP = 100;
-        SQUARE_BASE_DMG = 10;
+        SQUARE_BASE_DMG = 10.0;
         DIAMOND_BASE_HP = 200;
-        DIAMOND_BASE_DMG = 6;
+        DIAMOND_BASE_DMG = 6.0;
         CIRCLE_BASE_HP = 60;
-        CIRCLE_BASE_DMG = 12;
+        CIRCLE_BASE_DMG = 12.0;
         HEALER_BASE_HP = 120;
-        HEALER_BASE_DMG = 0;
+        HEALER_BASE_DMG = 0.0;
         enemyManager.getEnemies().add(new SquareEnemy(1000, 1000));
         enemyManager.getEnemies().add(new HealerEnemy(1100, 1100));
         camera = new Camera(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, MAP_WIDTH, MAP_HEIGHT);

@@ -71,11 +71,26 @@ public class EnemyManager {
         if (seconds >= Game.SQUARE_START) {
             squareTimer++;
             if (squareTimer >= Game.SQUARE_SPAWN_RATE) {
-                SquareEnemy e = new SquareEnemy((int) (Math.random() * Game.MAP_WIDTH), (int) (Math.random() * Game.MAP_HEIGHT));
-                e.setMaxHealth(game.SQUARE_BASE_HP);
-                e.setFullHealth();
-                e.setDamage((int)game.SQUARE_BASE_DMG);
-                enemies.add(e);
+                int attempts = 0;
+                boolean spawned = false;
+                while (attempts < 20 && !spawned) {
+                    int ex = (int) (Math.random() * Game.MAP_WIDTH);
+                    int ey = (int) (Math.random() * Game.MAP_HEIGHT);
+                    java.awt.Rectangle enemyRect = new java.awt.Rectangle(ex, ey, 28, 28); // Assuming enemy size 28x28
+                    boolean collides = false;
+                    for (Wall wall : game.getWallManager().getWalls()) {
+                        if (wall.getBounds().intersects(enemyRect)) { collides = true; break; }
+                    }
+                    if (!collides) {
+                        SquareEnemy e = new SquareEnemy(ex, ey);
+                        e.setMaxHealth(game.SQUARE_BASE_HP);
+                        e.setFullHealth();
+                        e.setDamage(game.SQUARE_BASE_DMG);
+                        enemies.add(e);
+                        spawned = true;
+                    }
+                    attempts++;
+                }
                 squareTimer = 0;
             }
         }
@@ -84,11 +99,26 @@ public class EnemyManager {
             diamondTimer++;
             int rate = (seconds >= Game.DIAMOND_LOW_RATE_START) ? Game.DIAMOND_SPAWN_RATE : 600;
             if (diamondTimer >= rate) {
-                DiamondEnemy e = new DiamondEnemy((int) (Math.random() * Game.MAP_WIDTH), (int) (Math.random() * Game.MAP_HEIGHT));
-                e.setMaxHealth(game.DIAMOND_BASE_HP);
-                e.setFullHealth();
-                e.setDamage((int)game.DIAMOND_BASE_DMG);
-                enemies.add(e);
+                int attempts = 0;
+                boolean spawned = false;
+                while (attempts < 20 && !spawned) {
+                    int ex = (int) (Math.random() * Game.MAP_WIDTH);
+                    int ey = (int) (Math.random() * Game.MAP_HEIGHT);
+                    java.awt.Rectangle enemyRect = new java.awt.Rectangle(ex, ey, 28, 28);
+                    boolean collides = false;
+                    for (Wall wall : game.getWallManager().getWalls()) {
+                        if (wall.getBounds().intersects(enemyRect)) { collides = true; break; }
+                    }
+                    if (!collides) {
+                        DiamondEnemy e = new DiamondEnemy(ex, ey);
+                        e.setMaxHealth(game.DIAMOND_BASE_HP);
+                        e.setFullHealth();
+                        e.setDamage(game.DIAMOND_BASE_DMG);
+                        enemies.add(e);
+                        spawned = true;
+                    }
+                    attempts++;
+                }
                 diamondTimer = 0;
             }
         }
@@ -96,11 +126,26 @@ public class EnemyManager {
         if (seconds >= Game.CIRCLE_START) {
             circleTimer++;
             if (circleTimer >= Game.CIRCLE_SPAWN_RATE) {
-                CircleEnemy e = new CircleEnemy((int) (Math.random() * Game.MAP_WIDTH), (int) (Math.random() * Game.MAP_HEIGHT));
-                e.setMaxHealth(game.CIRCLE_BASE_HP);
-                e.setFullHealth();
-                e.setDamage((int)game.CIRCLE_BASE_DMG);
-                enemies.add(e);
+                int attempts = 0;
+                boolean spawned = false;
+                while (attempts < 20 && !spawned) {
+                    int ex = (int) (Math.random() * Game.MAP_WIDTH);
+                    int ey = (int) (Math.random() * Game.MAP_HEIGHT);
+                    java.awt.Rectangle enemyRect = new java.awt.Rectangle(ex, ey, 28, 28);
+                    boolean collides = false;
+                    for (Wall wall : game.getWallManager().getWalls()) {
+                        if (wall.getBounds().intersects(enemyRect)) { collides = true; break; }
+                    }
+                    if (!collides) {
+                        CircleEnemy e = new CircleEnemy(ex, ey);
+                        e.setMaxHealth(game.CIRCLE_BASE_HP);
+                        e.setFullHealth();
+                        e.setDamage(game.CIRCLE_BASE_DMG);
+                        enemies.add(e);
+                        spawned = true;
+                    }
+                    attempts++;
+                }
                 circleTimer = 0;
             }
         }
@@ -108,11 +153,26 @@ public class EnemyManager {
         if (seconds >= Game.HEALER_START) {
             healerTimer++;
             if (healerTimer >= Game.HEALER_SPAWN_RATE) {
-                HealerEnemy e = new HealerEnemy((int) (Math.random() * Game.MAP_WIDTH), (int) (Math.random() * Game.MAP_HEIGHT));
-                e.setMaxHealth(game.HEALER_BASE_HP);
-                e.setFullHealth();
-                e.setDamage((int)game.HEALER_BASE_DMG);
-                enemies.add(e);
+                int attempts = 0;
+                boolean spawned = false;
+                while (attempts < 20 && !spawned) {
+                    int ex = (int) (Math.random() * Game.MAP_WIDTH);
+                    int ey = (int) (Math.random() * Game.MAP_HEIGHT);
+                    java.awt.Rectangle enemyRect = new java.awt.Rectangle(ex, ey, 28, 28);
+                    boolean collides = false;
+                    for (Wall wall : game.getWallManager().getWalls()) {
+                        if (wall.getBounds().intersects(enemyRect)) { collides = true; break; }
+                    }
+                    if (!collides) {
+                        HealerEnemy e = new HealerEnemy(ex, ey);
+                        e.setMaxHealth(game.HEALER_BASE_HP);
+                        e.setFullHealth();
+                        e.setDamage(game.HEALER_BASE_DMG);
+                        enemies.add(e);
+                        spawned = true;
+                    }
+                    attempts++;
+                }
                 healerTimer = 0;
             }
         }
