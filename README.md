@@ -3,7 +3,7 @@
 A top-down roguelike shooter built in pure Java, created for students to learn from while I was teaching at University of Engineering and Technology, Peshawar.
 The game demonstrates object-oriented design, AI state machines, and progressive difficulty — all implemented without any external game engine.
 
-Download the game using this link: https://download-directory.github.io/?url=https%3A%2F%2Fgithub.com%2FBehram-Khan-1%2FRougeLike2025%2Ftree%2Fmain%2Fdist%2FRougeLike2025
+to download the game, either dowload whole repository and game is in dist folder or copy that dist folder link into a github folder downloader tool.
 
 It simple downloads the rougelike/dist folder and then run the .exe
 
